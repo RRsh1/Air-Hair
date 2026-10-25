@@ -56,13 +56,22 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 
 ## Patient app (/c/<clinic slug>)
 - Patients sign in with national ID + mobile + SMS code (src/lib/patient-auth). Never reveal whether
-  a patient exists. Sessions are our own (patient_sessions), cookie scoped to /c/<slug>.
+  a patient exists: an unmatched request stores a decoy challenge (patient_id null) through the same
+  queries, the SMS goes out via `after()`, and decoys verify exactly like wrong codes. Limits are keyed
+  on the typed (ID, phone) pair; 10 wrong codes a day block that pair. Keep both paths identical.
+- Client IPs come only from `clientIpFromHeaders` (src/lib/net): trusted on Vercel, or with
+  TRUST_PROXY_HEADERS=1; otherwise null and a shared "unknown" bucket.
+- Sessions are our own (patient_sessions), cookie scoped to /c/<slug>; src/proxy.ts slides its lifetime.
 - Every patient page calls `requirePatient(slug)` after `await connection()` (time-dependent data).
 - The server decides the day of a photo (`anglesOpenNow`, `savePatientPhoto`); the client never does.
-- Photos: browser crops to 3:4, resizes to 1600px and re-encodes JPEG (strips EXIF); server checks
-  JPEG bytes and size. Storage goes through src/lib/storage (local disk in dev, R2 later).
+- Photos: browser crops to 3:4, resizes to 1600px and re-encodes JPEG (strips EXIF); the server runs
+  `sanitizeJpeg` (whole-file walk, drops metadata, nothing after EOI) and stores its output. Saves lock
+  the treatment row and re-check the schedule; a file whose DB write fails is deleted. Uploads need a
+  same-origin Origin and a Content-Length. Photos are served `no-store` with a sandbox CSP.
+  Storage goes through src/lib/storage (local disk in dev, R2 later).
 - Patient UI colors come only from theme tokens (src/lib/theme/patient-theme.ts, `bg-p-*` classes).
-- SMS: src/lib/notifications/sms.ts prints to the console in development.
+- SMS: src/lib/notifications/sms.ts prints to the console in development; in production there is no
+  provider yet, so patient login is closed for everyone until one is added.
 
 ## Local database without Neon
 `DATABASE_URL=pglite:.data/pglite` runs everything on an in-process Postgres saved to disk
@@ -70,5 +79,5 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 
 ## Status
 Done: foundations, staff auth (TOTP), patient app v1 (login, film-strip timeline, capture with
-alignment ghost, day view with comparison). Next: consent screen, clinic dashboard (patients,
+alignment ghost, day view with comparison), patient-side security review fixes. Next: consent screen, clinic dashboard (patients,
 timeline editor, branding), RLS on clinic_id, SMS + email providers, R2 storage.

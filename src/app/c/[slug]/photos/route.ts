@@ -4,15 +4,24 @@ import { MAX_UPLOAD_BYTES } from "@/lib/journal/jpeg";
 import { savePatientPhoto } from "@/lib/journal/patient-journal";
 import { getPatientContext, requestIp } from "@/lib/patient-auth/server";
 import { getStorage } from "@/lib/storage";
+import { isSameOrigin } from "@/lib/net/same-origin";
 import { photoAngles, type PhotoAngle } from "@/lib/timeline/capture-schedule";
 
 /** Upload of one angle of today's capture. The server decides the day; the client never does. */
 export async function POST(request: NextRequest, { params }: RouteContext<"/c/[slug]/photos">) {
   const { slug } = await params;
+  // Only our own pages may post here (the cookie is SameSite=Lax; this is the second lock).
+  if (!isSameOrigin(request)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+
   const context = await getPatientContext(slug);
   if (!context) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  if (Number(request.headers.get("content-length") ?? 0) > MAX_UPLOAD_BYTES + 64 * 1024) {
+  // The body is read into memory, so its size must be declared and small.
+  const declared = Number(request.headers.get("content-length"));
+  if (!request.headers.has("content-length") || !Number.isInteger(declared) || declared <= 0) {
+    return NextResponse.json({ error: "length_required" }, { status: 411 });
+  }
+  if (declared > MAX_UPLOAD_BYTES + 64 * 1024) {
     return NextResponse.json({ error: "too_large" }, { status: 413 });
   }
 

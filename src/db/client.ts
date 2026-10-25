@@ -34,7 +34,7 @@ export function getDb(): Database {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error("DATABASE_URL is not set");
     if (url.startsWith("pglite:")) {
-      if (process.env.NODE_ENV === "production" && !process.env.ALLOW_PGLITE) {
+      if (process.env.NODE_ENV === "production" && process.env.ALLOW_PGLITE !== "1") {
         throw new Error("pglite: databases are for local development only");
       }
       instance = drizzle(pgliteFor(url.slice("pglite:".length)), { schema: fullSchema }) as unknown as Database;

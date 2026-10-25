@@ -5,15 +5,14 @@ import { cache } from "react";
 import { getDb } from "@/db/client";
 import { loadClinicBySlug, type ClinicRecord } from "@/lib/clinic/load";
 import { loadPatientJournal, type PatientJournal } from "@/lib/journal/patient-journal";
+import { clientIpFromHeaders } from "@/lib/net/client-ip";
 import { loadPatientSession, patientCookieName } from "./session";
 
 export type PatientContext = { clinic: ClinicRecord; journal: PatientJournal; sessionId: string };
 
-/** Client IP as set by the platform (Vercel overwrites these headers; clients can't spoof them there). */
+/** Client IP from trusted proxy headers only (see clientIpFromHeaders); null when unknown. */
 export async function requestIp(): Promise<string | null> {
-  const h = await headers();
-  const forwarded = h.get("x-vercel-forwarded-for") ?? h.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || null;
+  return clientIpFromHeaders(await headers());
 }
 
 export const getClinic = cache(async (slug: string) => loadClinicBySlug(getDb(), slug));

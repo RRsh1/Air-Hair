@@ -467,19 +467,30 @@ export const patientSessions = pgTable(
 );
 
 /** Fixed-window counters for patient login rate limits. Keys hold digests, never raw identifiers. */
-export const rateLimitBuckets = pgTable("rate_limit_buckets", {
-  key: text("key").primaryKey(),
-  count: integer("count").notNull(),
-  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
-});
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("rate_limit_buckets_window_idx").on(t.windowStart)],
+);
 
+/**
+ * One row per code request, including requests that match no patient ("decoys", patient_id null),
+ * so both paths do the same work and verification can't tell them apart.
+ */
 export const otpChallenges = pgTable(
   "otp_challenges",
   {
     id: id(),
-    patientId: uuid("patient_id")
+    clinicId: uuid("clinic_id")
       .notNull()
-      .references(() => patients.id, { onDelete: "cascade" }),
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id"),
+    /** Digest of the (ID, phone) blind indexes that were entered; keys the per-person limits. */
+    subjectKey: text("subject_key").notNull(),
     /** Keyed hash (see hashSecret), salted with this row's id. */
     codeHash: text("code_hash").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -488,7 +499,15 @@ export const otpChallenges = pgTable(
     ip: text("ip"),
     createdAt: createdAt(),
   },
-  (t) => [index("otp_challenges_patient_created_idx").on(t.patientId, t.createdAt)],
+  (t) => [
+    index("otp_challenges_subject_created_idx").on(t.clinicId, t.subjectKey, t.createdAt),
+    index("otp_challenges_created_idx").on(t.createdAt),
+    foreignKey({
+      columns: [t.patientId, t.clinicId],
+      foreignColumns: [patients.id, patients.clinicId],
+      name: "otp_challenges_patient_clinic_fk",
+    }).onDelete("cascade"),
+  ],
 );
 
 /** Append-only. No FKs, so entries survive patient deletion; store no identifying data. */

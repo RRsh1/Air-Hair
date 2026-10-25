@@ -20,9 +20,11 @@ export async function GET(_request: Request, { params }: RouteContext<"/c/[slug]
   return new Response(Buffer.from(object.body), {
     headers: {
       "content-type": object.contentType,
-      "cache-control": "private, max-age=3600, immutable",
+      // Medical photos: never kept in any cache, not even the browser's disk cache.
+      "cache-control": "private, no-store",
       "x-content-type-options": "nosniff",
-      "content-security-policy": "default-src 'none'",
+      "content-security-policy": "default-src 'none'; sandbox",
+      "cross-origin-resource-policy": "same-origin",
     },
   });
 }

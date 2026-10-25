@@ -14,7 +14,7 @@ import {
   type Phase,
   type TreatmentTiming,
 } from "../timeline/days";
-import { inspectJpeg, MAX_DIMENSION, MAX_UPLOAD_BYTES } from "./jpeg";
+import { MAX_DIMENSION, MAX_UPLOAD_BYTES, sanitizeJpeg } from "./jpeg";
 import { parseContentBody, type ContentBody } from "./content-body";
 
 /** Everything the patient app needs about one patient's current treatment. */
@@ -70,38 +70,17 @@ export async function loadPatientJournal(
     .limit(1);
   if (!row) return null;
 
-  const timing: TreatmentTiming =
-    row.status === "performed" && row.actual
-      ? { status: "performed", actualSurgeryDate: row.actual as IsoDate }
-      : { status: "scheduled", plannedSurgeryDate: row.planned as IsoDate };
+  const timing = toTiming(row);
 
-  const [ruleRows, contentRows, entryRows] = await Promise.all([
+  const [ruleRows, contentRows, entries] = await Promise.all([
     db.select().from(captureRules).where(eq(captureRules.versionId, row.versionId)),
     db
       .select()
       .from(timelineContent)
       .where(eq(timelineContent.versionId, row.versionId))
       .orderBy(asc(timelineContent.sortOrder)),
-    db
-      .select({ id: journalEntries.id, phase: journalEntries.phase, capturedAt: journalEntries.capturedAt })
-      .from(journalEntries)
-      .where(eq(journalEntries.treatmentId, row.treatmentId))
-      .orderBy(asc(journalEntries.capturedAt)),
+    loadEntries(db, row.treatmentId),
   ]);
-
-  const photoRows =
-    entryRows.length === 0
-      ? []
-      : await db
-          .select({ id: photos.id, entryId: photos.entryId, angle: photos.angle, width: photos.width, height: photos.height })
-          .from(photos)
-          .where(inArray(photos.entryId, entryRows.map((entry) => entry.id)));
-
-  const entries: JournalEntryView[] = entryRows.map((entry) => ({ ...entry, photos: {} }));
-  const byId = new Map(entries.map((entry) => [entry.id, entry]));
-  for (const photo of photoRows) {
-    byId.get(photo.entryId)!.photos[photo.angle] = { id: photo.id, width: photo.width, height: photo.height };
-  }
 
   const fullName = decryptField(row.fullNameEnc, { context: "patients.full_name", rowId: row.patientId }, input.keyring);
 
@@ -124,6 +103,33 @@ export async function loadPatientJournal(
       body: parseContentBody(item.body),
     })),
   };
+}
+
+function toTiming(row: { status: "scheduled" | "performed"; planned: string; actual: string | null }): TreatmentTiming {
+  return row.status === "performed" && row.actual
+    ? { status: "performed", actualSurgeryDate: row.actual as IsoDate }
+    : { status: "scheduled", plannedSurgeryDate: row.planned as IsoDate };
+}
+
+async function loadEntries(db: Database, treatmentId: string): Promise<JournalEntryView[]> {
+  const entryRows = await db
+    .select({ id: journalEntries.id, phase: journalEntries.phase, capturedAt: journalEntries.capturedAt })
+    .from(journalEntries)
+    .where(eq(journalEntries.treatmentId, treatmentId))
+    .orderBy(asc(journalEntries.capturedAt));
+  if (entryRows.length === 0) return [];
+
+  const photoRows = await db
+    .select({ id: photos.id, entryId: photos.entryId, angle: photos.angle, width: photos.width, height: photos.height })
+    .from(photos)
+    .where(inArray(photos.entryId, entryRows.map((entry) => entry.id)));
+
+  const entries: JournalEntryView[] = entryRows.map((entry) => ({ ...entry, photos: {} }));
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  for (const photo of photoRows) {
+    byId.get(photo.entryId)!.photos[photo.angle] = { id: photo.id, width: photo.width, height: photo.height };
+  }
+  return entries;
 }
 
 function toCaptureRule(row: typeof captureRules.$inferSelect): CaptureRule {
@@ -168,67 +174,95 @@ export type SavePhotoResult =
   | { status: "not_allowed" }
   | { status: "invalid_image"; reason: "format" | "size" | "dimensions" };
 
-/** Stores a patient's photo for one angle of today's capture (a retake replaces the old file). */
+/**
+ * Stores a patient's photo for one angle of today's capture (a retake replaces the old file).
+ *
+ * Concurrency: the treatment row is locked for the write, and the open entry and allowed angles
+ * are re-read under that lock, so parallel uploads (three angles at once, a double tap) share one
+ * entry and can't exceed the schedule. The cleaned file is written first; if the database write
+ * doesn't happen, the file is deleted again.
+ */
 export async function savePatientPhoto(
   db: Database,
   storage: ObjectStorage,
   input: { journal: PatientJournal; angle: PhotoAngle; bytes: Uint8Array; ip: string | null; now?: Date },
 ): Promise<SavePhotoResult> {
   const now = input.now ?? new Date();
-  const { journal, angle, bytes } = input;
+  const { journal, angle } = input;
 
   if (!anglesOpenNow(journal, now).includes(angle)) return { status: "not_allowed" };
-  if (bytes.length === 0 || bytes.length > MAX_UPLOAD_BYTES) return { status: "invalid_image", reason: "size" };
-  const size = inspectJpeg(bytes);
-  if (!size) return { status: "invalid_image", reason: "format" };
-  if (size.width > MAX_DIMENSION || size.height > MAX_DIMENSION) return { status: "invalid_image", reason: "dimensions" };
+  if (input.bytes.length === 0 || input.bytes.length > MAX_UPLOAD_BYTES) return { status: "invalid_image", reason: "size" };
+  const image = sanitizeJpeg(input.bytes);
+  if (!image) return { status: "invalid_image", reason: "format" };
+  if (image.width > MAX_DIMENSION || image.height > MAX_DIMENSION) return { status: "invalid_image", reason: "dimensions" };
 
   const photoId = randomUUID();
   const storageKey = `clinics/${journal.clinicId}/patients/${journal.patientId}/photos/${photoId}.jpg`;
-  await storage.put(storageKey, bytes, "image/jpeg");
+  await storage.put(storageKey, image.bytes, "image/jpeg");
 
-  const open = openEntryFor(journal, now);
-  let replacedKey: string | null = null;
+  let outcome: { entryId: string; replacedKey: string | null } | null;
+  try {
+    outcome = await db.transaction(async (tx) => {
+      const [treatment] = await tx
+        .select({ status: treatments.status, planned: treatments.plannedSurgeryDate, actual: treatments.actualSurgeryDate })
+        .from(treatments)
+        .where(and(eq(treatments.id, journal.treatmentId), eq(treatments.clinicId, journal.clinicId)))
+        .for("update");
+      if (!treatment) return null;
 
-  const entryId = await db.transaction(async (tx) => {
-    const entryId =
-      open?.id ??
-      (
-        await tx
-          .insert(journalEntries)
-          .values({ treatmentId: journal.treatmentId, phase: phaseForNewEntry(journal.timing), capturedAt: now })
-          .returning({ id: journalEntries.id })
-      )[0].id;
+      const fresh: PatientJournal = {
+        ...journal,
+        timing: toTiming(treatment),
+        entries: await loadEntries(tx as unknown as Database, journal.treatmentId),
+      };
+      if (!anglesOpenNow(fresh, now).includes(angle)) return null;
 
-    const [previous] = await tx
-      .delete(photos)
-      .where(and(eq(photos.entryId, entryId), eq(photos.angle, angle)))
-      .returning({ storageKey: photos.storageKey });
-    replacedKey = previous?.storageKey ?? null;
+      const open = openEntryFor(fresh, now);
+      const entryId =
+        open?.id ??
+        (
+          await tx
+            .insert(journalEntries)
+            .values({ treatmentId: journal.treatmentId, phase: phaseForNewEntry(fresh.timing), capturedAt: now })
+            .returning({ id: journalEntries.id })
+        )[0].id;
 
-    await tx.insert(photos).values({
-      id: photoId,
-      entryId,
-      angle,
-      storageKey,
-      width: size.width,
-      height: size.height,
-      bytes: bytes.length,
+      const [previous] = await tx
+        .delete(photos)
+        .where(and(eq(photos.entryId, entryId), eq(photos.angle, angle)))
+        .returning({ storageKey: photos.storageKey });
+
+      await tx.insert(photos).values({
+        id: photoId,
+        entryId,
+        angle,
+        storageKey,
+        width: image.width,
+        height: image.height,
+        bytes: image.bytes.length,
+      });
+      await tx.insert(auditLog).values({
+        clinicId: journal.clinicId,
+        actorKind: "patient",
+        actorId: journal.patientId,
+        action: previous ? "photo.retake" : "photo.upload",
+        patientId: journal.patientId,
+        metadata: { angle },
+        ip: input.ip,
+      });
+      return { entryId, replacedKey: previous?.storageKey ?? null };
     });
-    await tx.insert(auditLog).values({
-      clinicId: journal.clinicId,
-      actorKind: "patient",
-      actorId: journal.patientId,
-      action: previous ? "photo.retake" : "photo.upload",
-      patientId: journal.patientId,
-      metadata: { angle },
-      ip: input.ip,
-    });
-    return entryId;
-  });
+  } catch (error) {
+    await storage.delete(storageKey).catch(() => {});
+    throw error;
+  }
 
-  if (replacedKey) await storage.delete(replacedKey);
-  return { status: "saved", photoId, entryId };
+  if (!outcome) {
+    await storage.delete(storageKey);
+    return { status: "not_allowed" };
+  }
+  if (outcome.replacedKey) await storage.delete(outcome.replacedKey);
+  return { status: "saved", photoId, entryId: outcome.entryId };
 }
 
 /** Storage key of a photo, if it belongs to this patient. */

@@ -2,18 +2,18 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { patientSessions } from "../../db/schema";
 import type { Database } from "../../db/types";
+import { SESSION_DAYS } from "./cookie";
 
 /**
  * Patient sessions: a random 32-byte token in an httpOnly cookie scoped to /c/<clinic>.
- * Only the SHA-256 of the token is stored. 30 days, extended while the patient keeps using the app.
+ * Only the SHA-256 of the token is stored. 30 days, extended while the patient keeps using the app:
+ * the row once a day here, the cookie on every visit by src/proxy.ts.
  */
 
-export const SESSION_DAYS = 30;
 const DAY_MS = 86_400_000;
 const REFRESH_AFTER_MS = DAY_MS;
 
-export const patientCookieName = "hairair_patient";
-export const patientCookiePath = (slug: string) => `/c/${slug}`;
+export { SESSION_DAYS, patientCookieName, patientCookiePath, patientSessionMaxAge } from "./cookie";
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
