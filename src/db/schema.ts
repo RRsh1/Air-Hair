@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { capabilities } from "../lib/authz/capabilities";
+import { staffRoles } from "../lib/authz/capabilities";
 import {
   bigserial,
   check,
@@ -48,6 +48,8 @@ export const contentType = pgEnum("content_type", ["tip", "recommendation", "ins
 export const assetKind = pgEnum("asset_kind", ["logo", "background", "document", "signature"]);
 export const legalDocumentKind = pgEnum("legal_document_kind", ["privacy_policy", "consent"]);
 export const legalDocumentFormat = pgEnum("legal_document_format", ["file", "text"]);
+/** Adding a role: extend staffRoles in src/lib/authz/capabilities.ts, then generate a migration. */
+export const staffRole = pgEnum("staff_role", staffRoles);
 export const actorKind = pgEnum("actor_kind", ["staff", "patient", "system"]);
 
 // ─── Clinic & configuration ───────────────────────────────────────────────────
@@ -106,45 +108,7 @@ export const clinicAssets = pgTable(
   (t) => [index("clinic_assets_clinic_kind_idx").on(t.clinicId, t.kind)],
 );
 
-// ─── Staff, roles, capabilities ───────────────────────────────────────────────
-
-/** System roles (admin, doctor) are seeded per clinic; custom roles are just more rows. */
-export const roles = pgTable(
-  "roles",
-  {
-    id: id(),
-    clinicId: uuid("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    systemKey: text("system_key"), // 'admin' | 'doctor' | null for custom roles
-    createdAt: createdAt(),
-  },
-  (t) => [
-    uniqueIndex("roles_id_clinic_uq").on(t.id, t.clinicId),
-    uniqueIndex("roles_clinic_name_uq").on(t.clinicId, t.name),
-    uniqueIndex("roles_clinic_system_key_uq").on(t.clinicId, t.systemKey),
-    check("roles_system_key_ck", sql`${t.systemKey} is null or ${t.systemKey} in ('admin', 'doctor')`),
-  ],
-);
-
-/** Only used by custom roles; system roles derive capabilities from clinic settings. */
-export const roleCapabilities = pgTable(
-  "role_capabilities",
-  {
-    roleId: uuid("role_id")
-      .notNull()
-      .references(() => roles.id, { onDelete: "cascade" }),
-    capability: text("capability").notNull(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.roleId, t.capability] }),
-    check(
-      "role_capabilities_known_ck",
-      sql`${t.capability} in (${sql.raw(capabilities.map((c) => `'${c}'`).join(", "))})`,
-    ),
-  ],
-);
+// ─── Staff ────────────────────────────────────────────────────────────────────
 
 export const staffUsers = pgTable(
   "staff_users",
@@ -153,7 +117,7 @@ export const staffUsers = pgTable(
     clinicId: uuid("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "cascade" }),
-    roleId: uuid("role_id").notNull(),
+    role: staffRole("role").notNull(),
     /** Link to the auth library's user record (Better Auth), set when the account is activated. */
     authUserId: text("auth_user_id").unique(),
     email: text("email").notNull(),
@@ -165,7 +129,6 @@ export const staffUsers = pgTable(
   (t) => [
     uniqueIndex("staff_users_id_clinic_uq").on(t.id, t.clinicId),
     uniqueIndex("staff_users_clinic_email_uq").on(t.clinicId, sql`lower(${t.email})`),
-    foreignKey({ name: "staff_users_role_fk", columns: [t.roleId, t.clinicId], foreignColumns: [roles.id, roles.clinicId] }),
   ],
 );
 

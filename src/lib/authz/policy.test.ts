@@ -13,14 +13,6 @@ const patientSelf: PatientActor = { kind: "patient", patientId: "p1", clinicId: 
 const p1 = { clinicId: "c1", patientId: "p1", assignedStaffIds: ["dr-cohen"] };
 const otherClinic = { clinicId: "c2", patientId: "p9", assignedStaffIds: ["dr-cohen"] };
 
-const custom = (staffId: string, caps: string[]): StaffActor => ({
-  kind: "staff",
-  staffId,
-  clinicId: "c1",
-  role: "custom",
-  customCapabilities: caps,
-});
-
 describe("patient visibility modes", () => {
   it("clinic_wide: every doctor sees every patient", () => {
     expect(canAccessPatient(drCohen, "patient.view", p1, clinicWide)).toBe(true);
@@ -40,34 +32,6 @@ describe("patient visibility modes", () => {
     expect(canAccessPatient(admin, "patient.view", otherClinic, clinicWide)).toBe(false);
     expect(canAccessPatient(drCohen, "patient.view", otherClinic, clinicWide)).toBe(false);
     expect(canAccessPatient({ ...patientSelf, clinicId: "c2" }, "patient.view", p1, clinicWide)).toBe(false);
-  });
-});
-
-describe("custom roles", () => {
-  it("a role without patient.view gets an empty patient list, not the whole clinic", () => {
-    const billing = custom("bill-1", ["settings.manage"]);
-    expect(patientScope(billing, clinicWide)).toEqual({ kind: "none" });
-    expect(canAccessPatient(billing, "patient.view", p1, clinicWide)).toBe(false);
-  });
-
-  it("sees only assigned patients unless patient.view_all is stored on the role", () => {
-    const receptionist = custom("rec-1", ["patient.view", "patient.create"]);
-    expect(patientScope(receptionist, clinicWide)).toEqual({ kind: "assigned", clinicId: "c1", staffId: "rec-1" });
-    expect(canAccessPatient(receptionist, "patient.view", p1, clinicWide)).toBe(false);
-
-    const seniorReceptionist = custom("rec-2", ["patient.view", "patient.view_all"]);
-    expect(canAccessPatient(seniorReceptionist, "patient.view", p1, assignedOnly)).toBe(true);
-  });
-
-  it("stays bound by clinic-wide restrictions", () => {
-    const editor = custom("ed-1", ["timeline.edit", "patient.create"]);
-    expect(canStaff(editor, "timeline.edit", clinicWide)).toBe(true);
-    expect(canStaff(editor, "timeline.edit", parseClinicSettings({ timelineEditing: "admins_only" }))).toBe(false);
-    expect(canStaff(editor, "patient.create", parseClinicSettings({ patientCreation: "admins_only" }))).toBe(false);
-  });
-
-  it("ignores unknown capability strings", () => {
-    expect(canStaff(custom("x", ["patient.superpower"]), "patient.view", clinicWide)).toBe(false);
   });
 });
 

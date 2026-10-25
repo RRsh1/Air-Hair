@@ -1,5 +1,5 @@
 import type { ClinicSettings } from "@/lib/clinic-settings/schema";
-import { customRoleCapabilities, systemRoleCapabilities, type Capability, type SystemRole } from "./capabilities";
+import { roleCapabilities, type Capability, type StaffRole } from "./capabilities";
 
 /**
  * The single place where access decisions are made. Screens, server actions and
@@ -12,11 +12,9 @@ export type StaffActor = {
   kind: "staff";
   staffId: string;
   clinicId: string;
+  role: StaffRole;
   disabled?: boolean;
-} & (
-  | { role: SystemRole }
-  | { role: "custom"; customCapabilities: readonly string[] }
-);
+};
 
 export type PatientActor = {
   kind: "patient";
@@ -35,10 +33,7 @@ export type PatientRef = {
 const NONE: ReadonlySet<Capability> = new Set();
 
 export function staffCapabilities(actor: StaffActor, settings: ClinicSettings): ReadonlySet<Capability> {
-  if (actor.disabled) return NONE;
-  return actor.role === "custom"
-    ? customRoleCapabilities(actor.customCapabilities, settings)
-    : systemRoleCapabilities(actor.role, settings);
+  return actor.disabled ? NONE : roleCapabilities(actor.role, settings);
 }
 
 /** Clinic-level actions that are not about one patient. */

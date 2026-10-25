@@ -1,11 +1,16 @@
 import type { ClinicSettings } from "@/lib/clinic-settings/schema";
 
 /**
- * Capabilities are the unit of permission. A role is just a set of capabilities,
- * so new roles (e.g. a receptionist) can be added as data without code changes.
+ * Capabilities are the unit of permission. Access decisions never look at a role's name;
+ * they ask whether the actor holds a capability.
  *
  * Visibility is a capability too: `patient.view` lets you open patients you can see,
  * `patient.view_all` widens what you can see from "assigned to me" to "the whole clinic".
+ *
+ * Adding a role later (e.g. a receptionist with fewer rights):
+ *  1. add it to `staffRoles` below and to the `staff_role` enum in src/db/schema.ts (+ migration),
+ *  2. add its case to `roleCapabilities`.
+ * Nothing else changes: policy.ts, screens and queries only see capabilities.
  */
 export const capabilities = [
   "patient.view",
@@ -25,36 +30,25 @@ export const capabilities = [
 
 export type Capability = (typeof capabilities)[number];
 
-export function isCapability(value: string): value is Capability {
-  return (capabilities as readonly string[]).includes(value);
-}
-
-export type SystemRole = "admin" | "doctor";
+export const staffRoles = ["admin", "doctor"] as const;
+export type StaffRole = (typeof staffRoles)[number];
 
 const DOCTOR_BASE: readonly Capability[] = ["patient.view", "patient.edit", "treatment.mark_performed"];
 
-/** Capabilities of a system role under the clinic's current settings. */
-export function systemRoleCapabilities(role: SystemRole, settings: ClinicSettings): Set<Capability> {
-  if (role === "admin") {
-    const set = new Set<Capability>(capabilities);
-    if (settings.patientCreation === "doctors_only") set.delete("patient.create");
-    return set;
+/** Capabilities of a role under the clinic's current settings. */
+export function roleCapabilities(role: StaffRole, settings: ClinicSettings): Set<Capability> {
+  switch (role) {
+    case "admin": {
+      const set = new Set<Capability>(capabilities);
+      if (settings.patientCreation === "doctors_only") set.delete("patient.create");
+      return set;
+    }
+    case "doctor": {
+      const set = new Set<Capability>(DOCTOR_BASE);
+      if (settings.patientVisibility === "clinic_wide") set.add("patient.view_all");
+      if (settings.timelineEditing === "admins_and_doctors") set.add("timeline.edit");
+      if (settings.patientCreation !== "admins_only") set.add("patient.create");
+      return set;
+    }
   }
-
-  const set = new Set<Capability>(DOCTOR_BASE);
-  if (settings.patientVisibility === "clinic_wide") set.add("patient.view_all");
-  if (settings.timelineEditing === "admins_and_doctors") set.add("timeline.edit");
-  if (settings.patientCreation !== "admins_only") set.add("patient.create");
-  return set;
-}
-
-/**
- * Custom roles keep the capabilities stored on them, but clinic-wide restrictions still win:
- * a clinic that set "admins only" for timeline editing or patient creation means it for everyone.
- */
-export function customRoleCapabilities(stored: readonly string[], settings: ClinicSettings): Set<Capability> {
-  const set = new Set(stored.filter(isCapability));
-  if (settings.timelineEditing === "admins_only") set.delete("timeline.edit");
-  if (settings.patientCreation !== "admins_and_doctors") set.delete("patient.create");
-  return set;
 }

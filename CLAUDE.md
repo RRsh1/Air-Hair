@@ -19,7 +19,8 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
    console.log, error messages, analytics or Sentry.
 2. **Every access decision goes through src/lib/authz/policy.ts** (`canStaff`, `canAccessPatient`,
    `patientScope`). Decisions are capabilities only, never `role === "doctor"`. A `{ kind: "none" }`
-   scope must become `WHERE false`.
+   scope must become `WHERE false`. Staff roles today: `admin` and `doctor` (a receptionist uses
+   `doctor`). To add a role, follow the steps at the top of src/lib/authz/capabilities.ts.
 3. **Clinic behaviour is configuration, not code.** Anything that may differ between clinics is a
    field in src/lib/clinic-settings/schema.ts with a `.default()`. Read settings only through
    `parseClinicSettings()`. Breaking changes bump the version and add a migration step.
