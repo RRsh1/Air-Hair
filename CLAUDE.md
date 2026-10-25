@@ -46,7 +46,9 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 - Better Auth, staff only (src/lib/auth/build-auth.ts). Patients never get a Better Auth account.
 - Every dashboard page and server action calls `requireStaff()`; src/proxy.ts is only an
   optimistic cookie redirect. With cacheComponents, session reads live inside `<Suspense>`.
-- TOTP is mandatory; a non-enrolled session may only reach /clinic/setup-2fa.
+- TOTP is mandatory; a non-enrolled session may only reach /clinic/setup-2fa. Completing
+  enrollment revokes the user's other sessions. Sessions are only created for active staff.
+- Disable staff only through `disableStaff()` (src/lib/staff), which also revokes sessions.
 - Auth tables: src/db/auth-schema.ts, regenerated with `npm run auth:schema` (then re-apply the
   auth_ prefix and withTimezone edits described in its header).
 - New clinic + first admin: `npm run clinic:create -- --name "..." --admin-email ... --admin-name "..."`.

@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { cache } from "react";
 import { getDb } from "@/db/client";
 import { sendPasswordLink } from "@/lib/notifications/mailer";
@@ -20,6 +21,9 @@ export function getAuth(): Auth {
       baseURL,
       sendPasswordLink,
       secureCookies: process.env.NODE_ENV === "production",
+      // Vercel sets this header itself and overwrites client values; elsewhere use the default.
+      clientIpHeader: process.env.VERCEL ? "x-vercel-forwarded-for" : undefined,
+      runInBackground: (task) => after(() => task.catch((error) => console.error("background task failed", error))),
     });
   }
   return instance;
