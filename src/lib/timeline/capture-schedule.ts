@@ -20,15 +20,36 @@ const ALL_ANGLES = photoAngles;
  *  weekly until the end of month one, then monthly until the end of follow-up.
  */
 export function defaultCaptureRules(followUpMonths: number): CaptureRule[] {
-  return [
+  const lastDay = followUpMonths * 30;
+  const rules: CaptureRule[] = [
     { phase: "pre_op", maxCount: 1, angles: ALL_ANGLES },
-    { phase: "post_op", fromDay: 0, toDay: 12, everyDays: 1, angles: ALL_ANGLES },
-    { phase: "post_op", fromDay: 19, toDay: 26, everyDays: 7, angles: ALL_ANGLES },
-    { phase: "post_op", fromDay: 60, toDay: followUpMonths * 30, everyDays: 30, angles: ALL_ANGLES },
+    { phase: "post_op", fromDay: 0, toDay: Math.min(12, lastDay), everyDays: 1, angles: ALL_ANGLES },
   ];
+  if (lastDay >= 19) rules.push({ phase: "post_op", fromDay: 19, toDay: Math.min(26, lastDay), everyDays: 7, angles: ALL_ANGLES });
+  if (lastDay >= 60) rules.push({ phase: "post_op", fromDay: 60, toDay: lastDay, everyDays: 30, angles: ALL_ANGLES });
+  return rules;
+}
+
+/** Upper bound for any rule's end day, so a typo can't create a decade-long schedule. */
+export function maxScheduleDay(followUpMonths: number): number {
+  return followUpMonths * 31;
+}
+
+function assertWellFormed(rule: Extract<CaptureRule, { phase: "post_op" }>): void {
+  if (
+    !Number.isInteger(rule.fromDay) ||
+    !Number.isInteger(rule.toDay) ||
+    !Number.isInteger(rule.everyDays) ||
+    rule.everyDays < 1 ||
+    rule.fromDay < 0 ||
+    rule.toDay < rule.fromDay
+  ) {
+    throw new Error(`Malformed capture rule: ${JSON.stringify(rule)}`);
+  }
 }
 
 function matchesPostOp(rule: Extract<CaptureRule, { phase: "post_op" }>, day: number): boolean {
+  assertWellFormed(rule);
   return day >= rule.fromDay && day <= rule.toDay && (day - rule.fromDay) % rule.everyDays === 0;
 }
 
@@ -58,23 +79,28 @@ export function postOpCaptureDays(rules: readonly CaptureRule[]): number[] {
   const days = new Set<number>();
   for (const rule of rules) {
     if (rule.phase !== "post_op") continue;
+    assertWellFormed(rule);
     for (let day = rule.fromDay; day <= rule.toDay; day += rule.everyDays) days.add(day);
   }
   return [...days].sort((a, b) => a - b);
 }
 
 /** Validation used by the timeline editor before publishing a version. */
-export function validateCaptureRules(rules: readonly CaptureRule[]): string[] {
+export function validateCaptureRules(rules: readonly CaptureRule[], followUpMonths: number): string[] {
   const errors: string[] = [];
+  const maxDay = maxScheduleDay(followUpMonths);
   rules.forEach((rule, index) => {
-    if (rule.angles.length === 0) errors.push(`Rule ${index + 1}: choose at least one angle`);
+    const n = index + 1;
+    if (rule.angles.length === 0) errors.push(`Rule ${n}: choose at least one angle`);
     if (rule.phase === "pre_op" && (!Number.isInteger(rule.maxCount) || rule.maxCount < 1)) {
-      errors.push(`Rule ${index + 1}: pre-op count must be at least 1`);
+      errors.push(`Rule ${n}: pre-op count must be at least 1`);
     }
     if (rule.phase === "post_op") {
-      if (!Number.isInteger(rule.fromDay) || rule.fromDay < 0) errors.push(`Rule ${index + 1}: start day must be 0 or later`);
-      if (rule.toDay < rule.fromDay) errors.push(`Rule ${index + 1}: end day is before start day`);
-      if (!Number.isInteger(rule.everyDays) || rule.everyDays < 1) errors.push(`Rule ${index + 1}: interval must be at least 1 day`);
+      if (!Number.isInteger(rule.fromDay) || rule.fromDay < 0) errors.push(`Rule ${n}: start day must be 0 or later`);
+      if (!Number.isInteger(rule.toDay)) errors.push(`Rule ${n}: end day must be a whole number`);
+      else if (rule.toDay < rule.fromDay) errors.push(`Rule ${n}: end day is before start day`);
+      else if (rule.toDay > maxDay) errors.push(`Rule ${n}: end day is past the follow-up period (day ${maxDay})`);
+      if (!Number.isInteger(rule.everyDays) || rule.everyDays < 1) errors.push(`Rule ${n}: interval must be at least 1 day`);
     }
   });
   return errors;

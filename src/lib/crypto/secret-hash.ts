@@ -9,8 +9,13 @@ import { getKeyring, type Keyring } from "./keyring";
  * `salt` should be the challenge id, so equal codes never produce equal hashes.
  */
 
+function key(keyring: Keyring): Buffer {
+  // Derived sub-key, separate from the blind-index sub-keys.
+  return createHmac("sha256", keyring.blindIndexKey).update("otp-secret").digest();
+}
+
 function digest(secret: string, salt: string, keyring: Keyring): Buffer {
-  return createHmac("sha256", keyring.blindIndexKey).update(`secret:${salt}:${secret}`).digest();
+  return createHmac("sha256", key(keyring)).update(`${salt}:${secret}`).digest();
 }
 
 export function hashSecret(secret: string, salt: string, keyring: Keyring = getKeyring()): string {
@@ -18,7 +23,6 @@ export function hashSecret(secret: string, salt: string, keyring: Keyring = getK
 }
 
 export function verifySecret(secret: string, salt: string, storedHash: string, keyring: Keyring = getKeyring()): boolean {
-  const expected = Buffer.from(storedHash, "hex");
-  const actual = digest(secret, salt, keyring);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+  if (!/^[0-9a-f]{64}$/.test(storedHash)) return false;
+  return timingSafeEqual(Buffer.from(storedHash, "hex"), digest(secret, salt, keyring));
 }

@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
+import { capabilities } from "../lib/authz/capabilities";
 import {
   bigserial,
   check,
+  foreignKey,
   date,
   index,
   integer,
@@ -21,12 +23,16 @@ import {
  * Conventions
  *  - Every tenant-owned table carries clinic_id (directly or through its parent), so
  *    multi-clinic support and Row Level Security need no structural change.
+ *  - Cross-table references between tenant rows use COMPOSITE foreign keys that include
+ *    clinic_id, so the database itself refuses links between two clinics.
  *  - Identifying patient fields are stored only as AES-256-GCM ciphertext (*_enc)
  *    plus an HMAC blind index (*_idx) for exact-match lookup. See src/lib/crypto.
  *  - Day numbers are never stored; they are derived from captured_at and the
  *    treatment's actual surgery date. See src/lib/timeline/days.ts.
- *  - Deleting a patient cascades to everything they own; audit_log keeps only
+ *  - Deleting a patient cascades to every row they own; audit_log keeps only
  *    a non-identifying record (no FK, so it survives the deletion).
+ *  - Cascades do NOT remove stored files (photos, signatures). Patient deletion must go
+ *    through the deletion service, which collects storage keys and removes the objects first.
  */
 
 const id = () => uuid("id").primaryKey().defaultRandom();
@@ -77,7 +83,11 @@ export const clinicThemes = pgTable(
     createdAt: createdAt(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("clinic_themes_clinic_version_uq").on(t.clinicId, t.version)],
+  (t) => [
+    uniqueIndex("clinic_themes_clinic_version_uq").on(t.clinicId, t.version),
+    uniqueIndex("clinic_themes_one_published_uq").on(t.clinicId).where(sql`${t.status} = 'published'`),
+    uniqueIndex("clinic_themes_one_draft_uq").on(t.clinicId).where(sql`${t.status} = 'draft'`),
+  ],
 );
 
 export const clinicAssets = pgTable(
@@ -111,6 +121,7 @@ export const roles = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    uniqueIndex("roles_id_clinic_uq").on(t.id, t.clinicId),
     uniqueIndex("roles_clinic_name_uq").on(t.clinicId, t.name),
     uniqueIndex("roles_clinic_system_key_uq").on(t.clinicId, t.systemKey),
     check("roles_system_key_ck", sql`${t.systemKey} is null or ${t.systemKey} in ('admin', 'doctor')`),
@@ -126,7 +137,13 @@ export const roleCapabilities = pgTable(
       .references(() => roles.id, { onDelete: "cascade" }),
     capability: text("capability").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.roleId, t.capability] })],
+  (t) => [
+    primaryKey({ columns: [t.roleId, t.capability] }),
+    check(
+      "role_capabilities_known_ck",
+      sql`${t.capability} in (${sql.raw(capabilities.map((c) => `'${c}'`).join(", "))})`,
+    ),
+  ],
 );
 
 export const staffUsers = pgTable(
@@ -136,9 +153,7 @@ export const staffUsers = pgTable(
     clinicId: uuid("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "cascade" }),
-    roleId: uuid("role_id")
-      .notNull()
-      .references(() => roles.id),
+    roleId: uuid("role_id").notNull(),
     /** Link to the auth library's user record (Better Auth), set when the account is activated. */
     authUserId: text("auth_user_id").unique(),
     email: text("email").notNull(),
@@ -147,7 +162,11 @@ export const staffUsers = pgTable(
     createdAt: createdAt(),
     disabledAt: timestamp("disabled_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("staff_users_clinic_email_uq").on(t.clinicId, sql`lower(${t.email})`)],
+  (t) => [
+    uniqueIndex("staff_users_id_clinic_uq").on(t.id, t.clinicId),
+    uniqueIndex("staff_users_clinic_email_uq").on(t.clinicId, sql`lower(${t.email})`),
+    foreignKey({ name: "staff_users_role_fk", columns: [t.roleId, t.clinicId], foreignColumns: [roles.id, roles.clinicId] }),
+  ],
 );
 
 // ─── Patients ─────────────────────────────────────────────────────────────────
@@ -170,8 +189,10 @@ export const patients = pgTable(
     createdBy: uuid("created_by").references(() => staffUsers.id, { onDelete: "set null" }),
   },
   (t) => [
+    uniqueIndex("patients_id_clinic_uq").on(t.id, t.clinicId),
     uniqueIndex("patients_clinic_national_id_uq").on(t.clinicId, t.nationalIdIdx),
-    index("patients_login_idx").on(t.nationalIdIdx, t.phoneIdx),
+    /** Login is always scoped to one clinic (blind indexes are per clinic too). */
+    index("patients_login_idx").on(t.clinicId, t.nationalIdIdx, t.phoneIdx),
   ],
 );
 
@@ -179,29 +200,43 @@ export const patients = pgTable(
 export const patientAssignments = pgTable(
   "patient_assignments",
   {
-    patientId: uuid("patient_id")
-      .notNull()
-      .references(() => patients.id, { onDelete: "cascade" }),
-    staffId: uuid("staff_id")
-      .notNull()
-      .references(() => staffUsers.id, { onDelete: "cascade" }),
+    clinicId: uuid("clinic_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.patientId, t.staffId] }), index("patient_assignments_staff_idx").on(t.staffId)],
+  (t) => [
+    primaryKey({ columns: [t.patientId, t.staffId] }),
+    index("patient_assignments_staff_idx").on(t.staffId),
+    foreignKey({
+      name: "patient_assignments_patient_fk",
+      columns: [t.patientId, t.clinicId],
+      foreignColumns: [patients.id, patients.clinicId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "patient_assignments_staff_fk",
+      columns: [t.staffId, t.clinicId],
+      foreignColumns: [staffUsers.id, staffUsers.clinicId],
+    }).onDelete("cascade"),
+  ],
 );
 
 // ─── Timeline templates (editable by the clinic) ──────────────────────────────
 
-export const timelineTemplates = pgTable("timeline_templates", {
-  id: id(),
-  clinicId: uuid("clinic_id")
-    .notNull()
-    .references(() => clinics.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  technique: text("technique"),
-  createdAt: createdAt(),
-  archivedAt: timestamp("archived_at", { withTimezone: true }),
-});
+export const timelineTemplates = pgTable(
+  "timeline_templates",
+  {
+    id: id(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    technique: text("technique"),
+    createdAt: createdAt(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("timeline_templates_id_clinic_uq").on(t.id, t.clinicId)],
+);
 
 /** Every publish creates a new version; treatments point at the version they follow. */
 export const timelineVersions = pgTable(
@@ -217,7 +252,12 @@ export const timelineVersions = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     publishedBy: uuid("published_by").references(() => staffUsers.id, { onDelete: "set null" }),
   },
-  (t) => [uniqueIndex("timeline_versions_template_version_uq").on(t.templateId, t.version)],
+  (t) => [
+    uniqueIndex("timeline_versions_id_template_uq").on(t.id, t.templateId),
+    uniqueIndex("timeline_versions_template_version_uq").on(t.templateId, t.version),
+    uniqueIndex("timeline_versions_one_published_uq").on(t.templateId).where(sql`${t.status} = 'published'`),
+    uniqueIndex("timeline_versions_one_draft_uq").on(t.templateId).where(sql`${t.status} = 'draft'`),
+  ],
 );
 
 const dayRange = {
@@ -258,8 +298,11 @@ export const captureRules = pgTable(
     index("capture_rules_version_idx").on(t.versionId),
     check(
       "capture_rules_shape_ck",
-      sql`(${t.phase} = 'pre_op' and ${t.maxCount} >= 1)
-       or (${t.phase} = 'post_op' and ${t.fromDay} >= 0 and ${t.toDay} >= ${t.fromDay} and ${t.everyDays} >= 1)`,
+      sql`(${t.phase} = 'pre_op' and ${t.maxCount} is not null and ${t.maxCount} >= 1
+            and ${t.fromDay} is null and ${t.toDay} is null and ${t.everyDays} is null)
+       or (${t.phase} = 'post_op' and ${t.maxCount} is null
+            and ${t.fromDay} is not null and ${t.toDay} is not null and ${t.everyDays} is not null
+            and ${t.fromDay} >= 0 and ${t.toDay} >= ${t.fromDay} and ${t.everyDays} >= 1)`,
     ),
   ],
 );
@@ -290,9 +333,7 @@ export const treatments = pgTable(
     clinicId: uuid("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "cascade" }),
-    patientId: uuid("patient_id")
-      .notNull()
-      .references(() => patients.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id").notNull(),
     status: treatmentStatus("status").notNull().default("scheduled"),
     /** Editable at any time while scheduled (postponements). */
     plannedSurgeryDate: date("planned_surgery_date").notNull(),
@@ -300,16 +341,28 @@ export const treatments = pgTable(
     actualSurgeryDate: date("actual_surgery_date"),
     performedMarkedAt: timestamp("performed_marked_at", { withTimezone: true }),
     performedMarkedBy: uuid("performed_marked_by").references(() => staffUsers.id, { onDelete: "set null" }),
-    templateId: uuid("template_id")
-      .notNull()
-      .references(() => timelineTemplates.id),
-    versionId: uuid("version_id")
-      .notNull()
-      .references(() => timelineVersions.id),
+    templateId: uuid("template_id").notNull(),
+    /** The template version this treatment follows; see clinic setting structuralChangesApplyTo. */
+    versionId: uuid("version_id").notNull(),
     createdAt: createdAt(),
   },
   (t) => [
     index("treatments_patient_idx").on(t.patientId),
+    foreignKey({
+      name: "treatments_patient_fk",
+      columns: [t.patientId, t.clinicId],
+      foreignColumns: [patients.id, patients.clinicId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "treatments_template_fk",
+      columns: [t.templateId, t.clinicId],
+      foreignColumns: [timelineTemplates.id, timelineTemplates.clinicId],
+    }),
+    foreignKey({
+      name: "treatments_version_fk",
+      columns: [t.versionId, t.templateId],
+      foreignColumns: [timelineVersions.id, timelineVersions.templateId],
+    }),
     index("treatments_clinic_status_idx").on(t.clinicId, t.status),
     check(
       "treatments_performed_ck",
@@ -372,6 +425,7 @@ export const legalDocuments = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
   },
   (t) => [
+    uniqueIndex("legal_documents_id_clinic_uq").on(t.id, t.clinicId),
     uniqueIndex("legal_documents_clinic_kind_version_uq").on(t.clinicId, t.kind, t.version),
     check(
       "legal_documents_format_ck",
@@ -384,19 +438,28 @@ export const consents = pgTable(
   "consents",
   {
     id: id(),
-    patientId: uuid("patient_id")
-      .notNull()
-      .references(() => patients.id, { onDelete: "cascade" }),
-    documentId: uuid("document_id")
-      .notNull()
-      .references(() => legalDocuments.id),
+    clinicId: uuid("clinic_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    documentId: uuid("document_id").notNull(),
     contentHash: text("content_hash").notNull(),
     signatureStorageKey: text("signature_storage_key").notNull(),
     signedAt: timestamp("signed_at", { withTimezone: true }).notNull().defaultNow(),
     ip: text("ip"),
     userAgent: text("user_agent"),
   },
-  (t) => [index("consents_patient_idx").on(t.patientId)],
+  (t) => [
+    index("consents_patient_idx").on(t.patientId),
+    foreignKey({
+      name: "consents_patient_fk",
+      columns: [t.patientId, t.clinicId],
+      foreignColumns: [patients.id, patients.clinicId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "consents_document_fk",
+      columns: [t.documentId, t.clinicId],
+      foreignColumns: [legalDocuments.id, legalDocuments.clinicId],
+    }),
+  ],
 );
 
 // ─── Auth & audit ─────────────────────────────────────────────────────────────

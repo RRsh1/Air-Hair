@@ -1,4 +1,11 @@
-export { encryptField, decryptField, needsReencryption, encryptedKeyVersion, type FieldContext } from "./field-encryption";
-export { blindIndex, type IndexContext } from "./blind-index";
+export {
+  encryptField,
+  decryptField,
+  needsReencryption,
+  encryptedKeyVersion,
+  type FieldContext,
+  type FieldBinding,
+} from "./field-encryption";
+export { nationalIdIndex, phoneIndex } from "./blind-index";
 export { getKeyring, parseKeyring, type Keyring } from "./keyring";
 export { hashSecret, verifySecret } from "./secret-hash";

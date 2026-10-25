@@ -7,8 +7,10 @@ import { getKeyring, type Keyring } from "./keyring";
  *
  * Stored format (text column):  v<version>.<iv>.<authTag>.<ciphertext>   (base64url parts)
  *
- * `context` is bound as Additional Authenticated Data, so a ciphertext copied from one
- * column (e.g. patients.phone) into another (patients.national_id) fails to decrypt.
+ * Additional Authenticated Data binds each ciphertext to its column AND its row:
+ *   "<context>|<rowId>"
+ * so a value copied into another column, or swapped between two patients, fails to decrypt.
+ * Generate the row's UUID in the application before encrypting (crypto.randomUUID()).
  */
 
 export type FieldContext =
@@ -17,23 +19,32 @@ export type FieldContext =
   | "patients.phone"
   | "staff_users.totp_secret";
 
-const IV_BYTES = 12;
-const FORMAT = /^v(\d+)\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]*)$/;
+export type FieldBinding = { context: FieldContext; rowId: string };
 
-export function encryptField(plaintext: string, context: FieldContext, keyring: Keyring = getKeyring()): string {
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
+// 12-byte IV = 16 base64url chars, 16-byte tag = 22 base64url chars (unpadded).
+const FORMAT = /^v(\d+)\.([A-Za-z0-9_-]{16})\.([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]*)$/;
+
+function aad({ context, rowId }: FieldBinding): Buffer {
+  if (!rowId) throw new Error("Field encryption requires a row id");
+  return Buffer.from(`${context}|${rowId}`, "utf8");
+}
+
+export function encryptField(plaintext: string, binding: FieldBinding, keyring: Keyring = getKeyring()): string {
   const version = keyring.currentVersion;
   const key = keyring.encryptionKeys.get(version)!;
   const iv = randomBytes(IV_BYTES);
 
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  cipher.setAAD(Buffer.from(context, "utf8"));
+  const cipher = createCipheriv("aes-256-gcm", key, iv, { authTagLength: TAG_BYTES });
+  cipher.setAAD(aad(binding));
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
 
   return `v${version}.${iv.toString("base64url")}.${tag.toString("base64url")}.${ciphertext.toString("base64url")}`;
 }
 
-export function decryptField(payload: string, context: FieldContext, keyring: Keyring = getKeyring()): string {
+export function decryptField(payload: string, binding: FieldBinding, keyring: Keyring = getKeyring()): string {
   const match = FORMAT.exec(payload);
   if (!match) throw new Error("Malformed encrypted field");
 
@@ -41,10 +52,14 @@ export function decryptField(payload: string, context: FieldContext, keyring: Ke
   const key = keyring.encryptionKeys.get(Number(versionText));
   if (!key) throw new Error(`No encryption key for version ${versionText}`);
 
-  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivText, "base64url"));
-  decipher.setAAD(Buffer.from(context, "utf8"));
-  decipher.setAuthTag(Buffer.from(tagText, "base64url"));
-  // Throws if the ciphertext, tag or context was tampered with.
+  const iv = Buffer.from(ivText, "base64url");
+  const tag = Buffer.from(tagText, "base64url");
+  if (iv.length !== IV_BYTES || tag.length !== TAG_BYTES) throw new Error("Malformed encrypted field");
+
+  const decipher = createDecipheriv("aes-256-gcm", key, iv, { authTagLength: TAG_BYTES });
+  decipher.setAAD(aad(binding));
+  decipher.setAuthTag(tag);
+  // Throws if the ciphertext, tag, column or row binding doesn't match.
   return Buffer.concat([decipher.update(Buffer.from(dataText, "base64url")), decipher.final()]).toString("utf8");
 }
 

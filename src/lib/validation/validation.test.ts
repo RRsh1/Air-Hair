@@ -20,7 +20,7 @@ describe("normalizeIsraeliId", () => {
 });
 
 describe("normalizeIsraeliMobile", () => {
-  it.each(["050-1234567", "0501234567", "+972501234567", "972-50-123-4567", "(050) 123 4567"])("normalizes %s", (input) => {
+  it.each(["050-1234567", "0501234567", "+972501234567", "00972501234567", "972-50-123-4567", "(050) 123 4567"])("normalizes %s", (input) => {
     expect(normalizeIsraeliMobile(input)).toBe("+972501234567");
   });
 

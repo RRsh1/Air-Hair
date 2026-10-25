@@ -1,8 +1,11 @@
+/** A 9-digit ID that passed normalizeIsraeliId; the only input blind indexes accept. */
+export type NormalizedIsraeliId = string & { readonly __brand: "NormalizedIsraeliId" };
+
 /**
  * Israeli ID number (Teudat Zehut) normalization and check-digit validation.
  * Returns the 9-digit normalized form, or null when invalid.
  */
-export function normalizeIsraeliId(input: string): string | null {
+export function normalizeIsraeliId(input: string): NormalizedIsraeliId | null {
   const digits = input.replace(/[\s-]/g, "");
   if (!/^\d{5,9}$/.test(digits)) return null;
 
@@ -15,5 +18,5 @@ export function normalizeIsraeliId(input: string): string | null {
     if (step > 9) step -= 9;
     sum += step;
   }
-  return sum % 10 === 0 ? id : null;
+  return sum % 10 === 0 ? (id as NormalizedIsraeliId) : null;
 }

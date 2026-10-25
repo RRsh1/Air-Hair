@@ -42,19 +42,23 @@ export const clinicSettingsSchema = z.object({
 
 export type ClinicSettings = z.infer<typeof clinicSettingsSchema>;
 
-type RawSettings = Record<string, unknown>;
+export type RawSettings = Record<string, unknown>;
+export type SettingsMigrations = Record<number, (settings: RawSettings) => RawSettings>;
 
 /** Step n migrates a version-n object to version n+1. Empty until the first breaking change. */
-const MIGRATIONS: Record<number, (settings: RawSettings) => RawSettings> = {};
+const MIGRATIONS: SettingsMigrations = {};
 
-function migrate(raw: RawSettings): RawSettings {
+/** An object with no version predates versioning (e.g. the column default `{}`), so it is version 1. */
+const FIRST_VERSION = 1;
+
+export function migrateSettings(raw: RawSettings, target: number, migrations: SettingsMigrations): RawSettings {
   let current = { ...raw };
-  let version = typeof current.version === "number" ? current.version : CLINIC_SETTINGS_VERSION;
-  if (version > CLINIC_SETTINGS_VERSION) {
-    throw new Error(`Clinic settings version ${version} is newer than this code (${CLINIC_SETTINGS_VERSION})`);
+  let version = typeof current.version === "number" ? current.version : FIRST_VERSION;
+  if (version > target) {
+    throw new Error(`Clinic settings version ${version} is newer than this code (${target})`);
   }
-  while (version < CLINIC_SETTINGS_VERSION) {
-    const step = MIGRATIONS[version];
+  while (version < target) {
+    const step = migrations[version];
     if (!step) throw new Error(`No clinic settings migration from version ${version}`);
     current = step(current);
     version += 1;
@@ -62,10 +66,10 @@ function migrate(raw: RawSettings): RawSettings {
   return { ...current, version };
 }
 
-/** Parse stored settings (possibly partial or old) into a complete, current object. */
+/** Parse stored settings (possibly partial or old) into a complete, current object. Always save the result whole. */
 export function parseClinicSettings(raw: unknown): ClinicSettings {
   const object = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as RawSettings) : {};
-  return clinicSettingsSchema.parse(migrate(object));
+  return clinicSettingsSchema.parse(migrateSettings(object, CLINIC_SETTINGS_VERSION, MIGRATIONS));
 }
 
 export const defaultClinicSettings: ClinicSettings = parseClinicSettings({});

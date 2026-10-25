@@ -12,25 +12,33 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 
 ## Non-negotiable rules
 1. **Patient identifiers are never stored or logged in plain text.** Full name, national ID and
-   phone go through `encryptField` (src/lib/crypto). Lookups use `blindIndex` on the
-   *normalized* value (`normalizeIsraeliId`, `normalizeIsraeliMobile`). Never pass these values
-   to console.log, error messages, analytics or Sentry.
+   phone go through `encryptField(value, { context, rowId })` (src/lib/crypto). Generate the
+   patient UUID in the app (`crypto.randomUUID()`) before encrypting, because the ciphertext is
+   bound to its row. Lookups use `nationalIdIndex` / `phoneIndex`, which only accept the branded
+   output of `normalizeIsraeliId` / `normalizeIsraeliMobile`. Never pass these values to
+   console.log, error messages, analytics or Sentry.
 2. **Every access decision goes through src/lib/authz/policy.ts** (`canStaff`, `canAccessPatient`,
-   `patientScope`). Never check `role === "doctor"` in a page or action.
+   `patientScope`). Decisions are capabilities only, never `role === "doctor"`. A `{ kind: "none" }`
+   scope must become `WHERE false`.
 3. **Clinic behaviour is configuration, not code.** Anything that may differ between clinics is a
    field in src/lib/clinic-settings/schema.ts with a `.default()`. Read settings only through
    `parseClinicSettings()`. Breaking changes bump the version and add a migration step.
-4. **Day numbers are derived, never stored.** Use src/lib/timeline/days.ts. Day 0 = actual surgery
-   date, set when the clinic marks the surgery performed. Pre-op photos have no day number.
-5. **Every query on tenant data is scoped by clinic_id.** Patient lists use `patientScope()`.
+4. **Phase is recorded, day numbers are derived.** A new journal entry stores
+   `phaseForNewEntry(timing)`; that phase is authoritative forever. Post-op day numbers come from
+   `entryPosition()` (captured_at + actual surgery date, clinic time zone) and are never stored.
+5. **Every query on tenant data is scoped by clinic_id**, and links between tenant rows use composite
+   foreign keys that include clinic_id. Patient login is scoped to one clinic (blind indexes are per clinic).
 6. **Photos are stored clean.** The clinic logo is overlaid at display time and burned in only on export.
+   Deleting a patient goes through a deletion service that removes stored files (photos, signatures)
+   before the DB row; FK cascades alone leave files behind.
 7. **Timeline content is structured JSON, never raw HTML.**
 8. Writes that view or change patient data append to `audit_log` (no identifying data in metadata).
 
 ## Commands
 - `npm test` — unit tests (crypto, validation, authz, settings, timeline)
 - `npm run typecheck`
-- `npm run db:generate -- --name <change>` then `npm run db:migrate` (dev branch only)
+- `npm run db:generate -- --name <change>` then `npm run db:migrate` (dev branch only).
+  Check generated SQL: drizzle-kit can emit composite FKs before the unique indexes they need.
 - `npm run keys:generate` — fresh encryption keys for .env.local
 
 ## Status
