@@ -170,10 +170,8 @@ describe("staff authentication", () => {
 
 describe("session hardening (security review findings)", () => {
   const EMAIL_B = "admin@second-clinic.test";
-  let clinicB: Awaited<ReturnType<typeof provisionClinic>>;
-
   beforeAll(async () => {
-    clinicB = await provisionClinic(db, auth, { clinicName: "מרפאה שנייה", adminEmail: EMAIL_B, adminName: "אדמין ב" });
+    await provisionClinic(db, auth, { clinicName: "מרפאה שנייה", adminEmail: EMAIL_B, adminName: "אדמין ב" });
     expect((await setPassword(EMAIL_B)).status).toBe(200);
   });
 
