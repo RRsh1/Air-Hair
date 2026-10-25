@@ -1,18 +1,19 @@
 import "server-only";
-import { neon } from "@neondatabase/serverless";
-import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
-import * as schema from "./schema";
+import { Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { fullSchema, type Database } from "./types";
 
-let instance: NeonHttpDatabase<typeof schema> | undefined;
+let instance: Database | undefined;
 
-/** Lazily created so builds and tests don't need DATABASE_URL until a query runs. */
-export function getDb(): NeonHttpDatabase<typeof schema> {
+/**
+ * Neon over WebSockets (supports transactions, needed for atomic writes and RLS context).
+ * Lazily created so builds and tests don't need DATABASE_URL until a query runs.
+ */
+export function getDb(): Database {
   if (!instance) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not set");
-    instance = drizzle(neon(url), { schema });
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) throw new Error("DATABASE_URL is not set");
+    instance = drizzle(new Pool({ connectionString }), { schema: fullSchema }) as unknown as Database;
   }
   return instance;
 }
-
-export { schema };

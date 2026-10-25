@@ -42,7 +42,16 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   Check generated SQL: drizzle-kit can emit composite FKs before the unique indexes they need.
 - `npm run keys:generate` — fresh encryption keys for .env.local
 
+## Staff authentication
+- Better Auth, staff only (src/lib/auth/build-auth.ts). Patients never get a Better Auth account.
+- Every dashboard page and server action calls `requireStaff()`; src/proxy.ts is only an
+  optimistic cookie redirect. With cacheComponents, session reads live inside `<Suspense>`.
+- TOTP is mandatory; a non-enrolled session may only reach /clinic/setup-2fa.
+- Auth tables: src/db/auth-schema.ts, regenerated with `npm run auth:schema` (then re-apply the
+  auth_ prefix and withTimezone edits described in its header).
+- New clinic + first admin: `npm run clinic:create -- --name "..." --admin-email ... --admin-name "..."`.
+
 ## Status
-Phase 1 (foundations) done: schema, encryption, authz engine, clinic settings, timeline math.
-Next: staff auth (Better Auth + mandatory TOTP), RLS policies on clinic_id, patient OTP login,
-SMS provider interface, private photo storage (Cloudflare R2, signed URLs).
+Done: foundations (schema, encryption, authz, settings, timeline math) and staff auth with
+mandatory TOTP. Next: RLS policies on clinic_id, email provider for password links, patient
+management + patient OTP login, SMS provider interface, private photo storage.

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { staffRoles } from "../lib/authz/capabilities";
+import { user as authUser } from "./auth-schema";
 import {
   bigserial,
   check,
@@ -119,7 +120,9 @@ export const staffUsers = pgTable(
       .references(() => clinics.id, { onDelete: "cascade" }),
     role: staffRole("role").notNull(),
     /** Link to the auth library's user record (Better Auth), set when the account is activated. */
-    authUserId: text("auth_user_id").unique(),
+    authUserId: text("auth_user_id")
+      .unique()
+      .references(() => authUser.id, { onDelete: "set null" }),
     email: text("email").notNull(),
     fullName: text("full_name").notNull(),
     totpSecretEnc: text("totp_secret_enc"),

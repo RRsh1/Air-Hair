@@ -1,25 +1,53 @@
 @import "tailwindcss";
 
+/*
+ * Hair&Air clinic interface tokens.
+ * Patient-facing colours will come from each clinic's theme; these are the staff defaults.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f5f7f6;
+  --surface: #ffffff;
+  --ink: #17262b;
+  --slate: #5b6b70;
+  --line: #d9e0e1;
+  --petrol: #1f5c63;
+  --petrol-strong: #174a50;
+  --signal: #b4232f;
+  --film: #1b2a2f;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: system-ui, -apple-system, "Segoe UI", "Arial Hebrew", Arial, sans-serif;
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-slate: var(--slate);
+  --color-line: var(--line);
+  --color-petrol: var(--petrol);
+  --color-petrol-strong: var(--petrol-strong);
+  --color-signal: var(--signal);
+  --color-film: var(--film);
+  --font-sans: var(--font-assistant), system-ui, "Arial Hebrew", Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+  }
+
+  /* In the base layer so components with their own focus ring (inputs) can replace it. */
+  :focus-visible {
+    outline: 2px solid var(--petrol);
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
