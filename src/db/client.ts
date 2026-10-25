@@ -1,7 +1,6 @@
 import "server-only";
-import { Pool } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { fullSchema, type Database } from "./types";
+import { createNeonDb } from "./neon";
+import type { Database } from "./types";
 
 let instance: Database | undefined;
 
@@ -13,7 +12,7 @@ export function getDb(): Database {
   if (!instance) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) throw new Error("DATABASE_URL is not set");
-    instance = drizzle(new Pool({ connectionString }), { schema: fullSchema }) as unknown as Database;
+    instance = createNeonDb(connectionString).db;
   }
   return instance;
 }

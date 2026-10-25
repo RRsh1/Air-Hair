@@ -7,9 +7,7 @@
  */
 import { config } from "dotenv";
 import { parseArgs } from "node:util";
-import { Pool } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { fullSchema, type Database } from "../src/db/types";
+import { createNeonDb } from "../src/db/neon";
 import { buildAuth } from "../src/lib/auth/build-auth";
 import { provisionClinic, sendSetPasswordLink } from "../src/lib/clinic/provision";
 
@@ -37,8 +35,7 @@ async function main() {
     throw new Error("DATABASE_URL, BETTER_AUTH_SECRET and BETTER_AUTH_URL must be set in .env.local");
   }
 
-  const pool = new Pool({ connectionString: DATABASE_URL });
-  const db = drizzle(pool, { schema: fullSchema }) as unknown as Database;
+  const { db, pool } = createNeonDb(DATABASE_URL);
 
   let link = "";
   const auth = buildAuth(db, {
@@ -61,7 +58,24 @@ async function main() {
   }
 }
 
+/** Prints the error and its chain of causes (Drizzle wraps the real database error). */
+function describe(error: unknown): string {
+  const lines: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 5; depth++) {
+    if (current instanceof Error) {
+      // Skip Drizzle's "Failed query" line: it echoes parameters, which can include personal data.
+      if (!current.message.startsWith("Failed query")) lines.push(current.message);
+      current = current.cause;
+    } else {
+      lines.push(String(current));
+      break;
+    }
+  }
+  return lines.join("\n  caused by: ") || "Unknown error";
+}
+
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
+  console.error(`Could not create the clinic:\n  ${describe(error)}`);
   process.exit(1);
 });
