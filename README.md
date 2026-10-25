@@ -5,6 +5,10 @@ clinic-defined schedule, follow daily guidance, and the clinic tracks progress f
 
 ## Getting started
 
+Requires Node 22 or newer (`nvm use` picks it up from `.nvmrc`). The dev server always runs on
+port 3000, because staff sign-in only accepts requests from `BETTER_AUTH_URL`. If it reports
+`EADDRINUSE`, another server is already on 3000: stop it with `lsof -ti :3000 | xargs kill`.
+
 ```bash
 npm install
 cp .env.example .env.local      # fill DATABASE_URL from the Neon dev branch
