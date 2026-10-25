@@ -29,11 +29,29 @@ export type StaffAccess =
   | { state: "needs_2fa_setup"; staff: StaffRecord }
   | { state: "ok"; staff: StaffRecord; actor: StaffActor };
 
-export function resolveStaffAccess(user: SessionUser | null, staff: StaffRecord | null): StaffAccess {
+export type AccessOptions = {
+  /** False only in local development (see staffTwoFactorRequired). Production always requires 2FA. */
+  requireTwoFactor?: boolean;
+};
+
+/**
+ * Whether staff must enroll TOTP. Defaults to required. REQUIRE_STAFF_2FA=false is honored only
+ * outside production, so a copied .env.local can never switch 2FA off on a live deployment.
+ */
+export function staffTwoFactorRequired(env: { NODE_ENV?: string; REQUIRE_STAFF_2FA?: string }): boolean {
+  if (env.NODE_ENV === "production") return true;
+  return env.REQUIRE_STAFF_2FA !== "false";
+}
+
+export function resolveStaffAccess(
+  user: SessionUser | null,
+  staff: StaffRecord | null,
+  { requireTwoFactor = true }: AccessOptions = {},
+): StaffAccess {
   if (!user) return { state: "anonymous" };
   if (!staff) return { state: "not_staff" };
   if (staff.disabledAt) return { state: "disabled" };
-  if (!user.twoFactorEnabled) return { state: "needs_2fa_setup", staff };
+  if (requireTwoFactor && !user.twoFactorEnabled) return { state: "needs_2fa_setup", staff };
   return {
     state: "ok",
     staff,

@@ -6,7 +6,7 @@ import { cache } from "react";
 import { getDb } from "@/db/client";
 import { sendPasswordLink } from "@/lib/notifications/mailer";
 import { buildAuth, type Auth } from "./build-auth";
-import { loadStaffByAuthUser, resolveStaffAccess, type StaffAccess } from "./staff-access";
+import { loadStaffByAuthUser, resolveStaffAccess, staffTwoFactorRequired, type StaffAccess } from "./staff-access";
 
 let instance: Auth | undefined;
 
@@ -36,7 +36,7 @@ export const getStaffAccess = cache(async (): Promise<StaffAccess> => {
   const session = await getAuth().api.getSession({ headers: requestHeaders });
   if (!session) return resolveStaffAccess(null, null);
   const staff = await loadStaffByAuthUser(getDb(), session.user.id);
-  return resolveStaffAccess(session.user, staff);
+  return resolveStaffAccess(session.user, staff, { requireTwoFactor: staffTwoFactorRequired(process.env) });
 });
 
 /**
