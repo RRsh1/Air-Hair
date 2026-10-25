@@ -27,6 +27,18 @@
   --color-signal: var(--signal);
   --color-film: var(--film);
   --font-sans: var(--font-assistant), system-ui, "Arial Hebrew", Arial, sans-serif;
+
+  /* Patient app tokens (set per clinic on the patient layout, see lib/theme/patient-theme.ts). */
+  --color-p-bg: var(--p-bg);
+  --color-p-surface: var(--p-surface);
+  --color-p-ink: var(--p-ink);
+  --color-p-muted: var(--p-muted);
+  --color-p-line: var(--p-line);
+  --color-p-accent: var(--p-accent);
+  --color-p-accent-ink: var(--p-accent-ink);
+  --color-p-film: var(--p-film);
+  --color-p-film-frame: var(--p-film-frame);
+  --radius-p: var(--p-radius);
 }
 
 @layer base {

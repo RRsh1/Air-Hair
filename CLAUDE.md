@@ -52,9 +52,23 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 - Disable staff only through `disableStaff()` (src/lib/staff), which also revokes sessions.
 - Auth tables: src/db/auth-schema.ts, regenerated with `npm run auth:schema` (then re-apply the
   auth_ prefix and withTimezone edits described in its header).
-- New clinic + first admin: `npm run clinic:create -- --name "..." --admin-email ... --admin-name "..."`.
+- New clinic + first admin: `npm run clinic:create -- --name "..." --slug demo --admin-email ... --admin-name "..."`.
+
+## Patient app (/c/<clinic slug>)
+- Patients sign in with national ID + mobile + SMS code (src/lib/patient-auth). Never reveal whether
+  a patient exists. Sessions are our own (patient_sessions), cookie scoped to /c/<slug>.
+- Every patient page calls `requirePatient(slug)` after `await connection()` (time-dependent data).
+- The server decides the day of a photo (`anglesOpenNow`, `savePatientPhoto`); the client never does.
+- Photos: browser crops to 3:4, resizes to 1600px and re-encodes JPEG (strips EXIF); server checks
+  JPEG bytes and size. Storage goes through src/lib/storage (local disk in dev, R2 later).
+- Patient UI colors come only from theme tokens (src/lib/theme/patient-theme.ts, `bg-p-*` classes).
+- SMS: src/lib/notifications/sms.ts prints to the console in development.
+
+## Local database without Neon
+`DATABASE_URL=pglite:.data/pglite` runs everything on an in-process Postgres saved to disk
+(`npm run db:migrate:local` first). Useful for end-to-end checks; never used in production.
 
 ## Status
-Done: foundations (schema, encryption, authz, settings, timeline math) and staff auth with
-mandatory TOTP. Next: RLS policies on clinic_id, email provider for password links, patient
-management + patient OTP login, SMS provider interface, private photo storage.
+Done: foundations, staff auth (TOTP), patient app v1 (login, film-strip timeline, capture with
+alignment ghost, day view with comparison). Next: consent screen, clinic dashboard (patients,
+timeline editor, branding), RLS on clinic_id, SMS + email providers, R2 storage.

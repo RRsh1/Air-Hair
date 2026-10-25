@@ -55,12 +55,21 @@ export const actorKind = pgEnum("actor_kind", ["staff", "patient", "system"]);
 
 // ─── Clinic & configuration ───────────────────────────────────────────────────
 
-export const clinics = pgTable("clinics", {
-  id: id(),
-  name: text("name").notNull(),
-  timeZone: text("time_zone").notNull().default("Asia/Jerusalem"),
-  createdAt: createdAt(),
-});
+export const clinics = pgTable(
+  "clinics",
+  {
+    id: id(),
+    /** URL segment of the clinic's patient app, e.g. /c/demo. Lowercase letters, digits, hyphens. */
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    timeZone: text("time_zone").notNull().default("Asia/Jerusalem"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("clinics_slug_uq").on(t.slug),
+    check("clinics_slug_ck", sql`${t.slug} ~ '^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$'`),
+  ],
+);
 
 /** Versioned JSON, always read through parseClinicSettings(). */
 export const clinicSettings = pgTable("clinic_settings", {
@@ -429,6 +438,40 @@ export const consents = pgTable(
 );
 
 // ─── Auth & audit ─────────────────────────────────────────────────────────────
+
+/**
+ * Patient sessions (patients never use Better Auth). The cookie holds a random token; only its
+ * SHA-256 is stored, so a leaked table can't be replayed. Scoped to one clinic.
+ */
+export const patientSessions = pgTable(
+  "patient_sessions",
+  {
+    id: id(),
+    clinicId: uuid("clinic_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+  },
+  (t) => [
+    index("patient_sessions_patient_idx").on(t.patientId),
+    foreignKey({
+      name: "patient_sessions_patient_fk",
+      columns: [t.patientId, t.clinicId],
+      foreignColumns: [patients.id, patients.clinicId],
+    }).onDelete("cascade"),
+  ],
+);
+
+/** Fixed-window counters for patient login rate limits. Keys hold digests, never raw identifiers. */
+export const rateLimitBuckets = pgTable("rate_limit_buckets", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+});
 
 export const otpChallenges = pgTable(
   "otp_challenges",

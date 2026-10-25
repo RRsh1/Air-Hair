@@ -82,7 +82,7 @@ beforeAll(async () => {
   db = drizzle(new PGlite(), { schema: fullSchema }) as unknown as Database;
   await migrate(db as never, { migrationsFolder: "drizzle" });
   auth = buildAuth(db, deps);
-  clinic = await provisionClinic(db, auth, { clinicName: "מרפאת בדיקה", adminEmail: EMAIL, adminName: "ד״ר בדיקה" });
+  clinic = await provisionClinic(db, auth, { slug: "test-1", clinicName: "מרפאת בדיקה", adminEmail: EMAIL, adminName: "ד״ר בדיקה" });
 }, 60_000);
 
 describe("clinic provisioning", () => {
@@ -171,7 +171,7 @@ describe("staff authentication", () => {
 describe("session hardening (security review findings)", () => {
   const EMAIL_B = "admin@second-clinic.test";
   beforeAll(async () => {
-    await provisionClinic(db, auth, { clinicName: "מרפאה שנייה", adminEmail: EMAIL_B, adminName: "אדמין ב" });
+    await provisionClinic(db, auth, { slug: "test-2", clinicName: "מרפאה שנייה", adminEmail: EMAIL_B, adminName: "אדמין ב" });
     expect((await setPassword(EMAIL_B)).status).toBe(200);
   });
 
@@ -193,7 +193,7 @@ describe("session hardening (security review findings)", () => {
   it("disabling staff revokes their sessions and blocks new sign-ins", async () => {
     // A fresh admin without 2FA, so password sign-in alone would normally create a session.
     const EMAIL_C = "admin@third-clinic.test";
-    const clinicC = await provisionClinic(db, auth, { clinicName: "מרפאה שלישית", adminEmail: EMAIL_C, adminName: "אדמין ג" });
+    const clinicC = await provisionClinic(db, auth, { slug: "test-3", clinicName: "מרפאה שלישית", adminEmail: EMAIL_C, adminName: "אדמין ג" });
     expect((await setPassword(EMAIL_C)).status).toBe(200);
 
     const owner = device();

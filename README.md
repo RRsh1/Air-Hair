@@ -21,11 +21,20 @@ npm run dev
 Create a clinic and its first admin, then open the printed link to set a password:
 
 ```bash
-npm run clinic:create -- --name "מרפאת דוגמה" --admin-email you@example.com --admin-name "שם מלא"
+npm run clinic:create -- --name "מרפאת דוגמה" --slug demo --admin-email you@example.com --admin-name "שם מלא"
 ```
 
 Sign in at http://localhost:3000/clinic/login. The first sign-in asks you to set up an
 authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, …).
+
+Create a test patient and open the patient app (the login code is printed in the dev server log):
+
+```bash
+npm run patient:create -- --clinic demo --name "ישראל ישראלי" --id 123456782 --phone 0501234567 --surgery 2026-11-01
+# add --performed to start the post-op timeline from that date
+```
+
+Then go to http://localhost:3000/c/demo/login.
 
 ## Structure
 

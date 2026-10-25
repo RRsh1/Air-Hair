@@ -14,6 +14,8 @@ import { isValidTimeZone } from "../timeline/days";
 
 export type ProvisionInput = {
   clinicName: string;
+  /** Patient app address: /c/<slug>. Lowercase letters, digits and hyphens. */
+  slug: string;
   timeZone?: string;
   adminEmail: string;
   adminName: string;
@@ -22,8 +24,18 @@ export type ProvisionInput = {
 
 export type ProvisionResult = { clinicId: string; staffId: string; authUserId: string; templateId: string };
 
+const SLUG = /^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$/;
+
+/** Lowercases and validates a clinic slug; null when it can't be a URL segment. */
+export function normalizeClinicSlug(input: string): string | null {
+  const slug = input.trim().toLowerCase();
+  return SLUG.test(slug) ? slug : null;
+}
+
 export async function provisionClinic(db: Database, auth: Auth, input: ProvisionInput): Promise<ProvisionResult> {
   const timeZone = input.timeZone ?? "Asia/Jerusalem";
+  const slug = normalizeClinicSlug(input.slug);
+  if (!slug) throw new Error(`Invalid clinic slug: ${input.slug} (use lowercase letters, digits and hyphens)`);
   if (!isValidTimeZone(timeZone)) throw new Error(`Invalid time zone: ${timeZone}`);
   const email = input.adminEmail.trim().toLowerCase();
   const settings = parseClinicSettings(input.settings ?? {});
@@ -43,7 +55,7 @@ export async function provisionClinic(db: Database, auth: Auth, input: Provision
   });
 
   return db.transaction(async (tx) => {
-    const [clinic] = await tx.insert(clinics).values({ name: input.clinicName, timeZone }).returning({ id: clinics.id });
+    const [clinic] = await tx.insert(clinics).values({ name: input.clinicName, slug, timeZone }).returning({ id: clinics.id });
     await tx.insert(clinicSettings).values({ clinicId: clinic.id, settings });
 
     const [staff] = await tx
