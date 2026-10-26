@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { angleHint, angleLabel, photoUrl } from "@/components/patient/format";
 import { anglesOpenNow, ghostPhotoFor } from "@/lib/journal/patient-journal";
-import { requirePatient } from "@/lib/patient-auth/server";
+import { requireConsentedPatient } from "@/lib/legal/server";
 import { photoAngles, type PhotoAngle } from "@/lib/timeline/capture-schedule";
 import { Camera } from "./camera";
 
@@ -19,7 +19,7 @@ async function CaptureBody({ params }: Pick<PageProps<"/c/[slug]/capture/[angle]
   await connection();
   const { slug, angle } = await params;
   if (!photoAngles.includes(angle as PhotoAngle)) notFound();
-  const context = await requirePatient(slug);
+  const context = await requireConsentedPatient(slug);
   const now = new Date();
   if (!anglesOpenNow(context.journal, now).includes(angle as PhotoAngle)) redirect(`/c/${slug}`);
 

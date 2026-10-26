@@ -5,7 +5,7 @@ import { ContentList } from "@/components/patient/content-list";
 import { formatDayMonth } from "@/components/patient/format";
 import { PatientHeader } from "@/components/patient/patient-header";
 import { buildFilmStrip, contentFor } from "@/lib/journal/film-strip";
-import { requirePatient } from "@/lib/patient-auth/server";
+import { requireConsentedPatient } from "@/lib/legal/server";
 import { CompareView, type ComparableFrame } from "./compare-view";
 
 export default function FramePage({ params }: PageProps<"/c/[slug]/frame/[key]">) {
@@ -19,7 +19,7 @@ export default function FramePage({ params }: PageProps<"/c/[slug]/frame/[key]">
 async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "params">) {
   await connection();
   const { slug, key } = await params;
-  const context = await requirePatient(slug);
+  const context = await requireConsentedPatient(slug);
   const frames = buildFilmStrip(context.journal, new Date());
   const frame = frames.find((f) => f.key === key);
   if (!frame || frame.status === "upcoming" || frame.status === "locked") notFound();

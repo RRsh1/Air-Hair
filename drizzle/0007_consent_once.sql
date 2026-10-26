@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "consents_patient_document_uq" ON "consents" USING btree ("patient_id","document_id");

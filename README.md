@@ -36,6 +36,14 @@ npm run patient:create -- --clinic demo --name "ישראל ישראלי" --id 12
 
 Then go to http://localhost:3000/c/demo/login.
 
+Publish the clinic's consent document and privacy policy (sample texts; a PDF works with `--pdf`).
+Patients sign the consent on their first visit after login:
+
+```bash
+npx tsx --conditions=react-server scripts/publish-legal.ts --clinic demo --kind consent --text scripts/samples/consent-sample.txt
+npx tsx --conditions=react-server scripts/publish-legal.ts --clinic demo --kind privacy --text scripts/samples/privacy-sample.txt
+```
+
 ## Structure
 
 ```

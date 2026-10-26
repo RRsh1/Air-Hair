@@ -62,7 +62,14 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 - Client IPs come only from `clientIpFromHeaders` (src/lib/net): trusted on Vercel, or with
   TRUST_PROXY_HEADERS=1; otherwise null and a shared "unknown" bucket.
 - Sessions are our own (patient_sessions), cookie scoped to /c/<slug>; src/proxy.ts slides its lifetime.
-- Every patient page calls `requirePatient(slug)` after `await connection()` (time-dependent data).
+- Every patient page calls `requireConsentedPatient(slug)` (src/lib/legal/server.ts) after
+  `await connection()`; only the consent page itself uses `requirePatient`. Uploads refuse
+  unconsented patients too.
+- Consent and privacy policy (src/lib/legal): each clinic publishes versions as text or PDF; the newest
+  published is current. A patient signs the current consent (drawn signature PNG + content hash, IP,
+  browser); a new version asks everyone again. No published consent document → nothing to sign.
+  Until the dashboard upload screen exists, publish with
+  `npx tsx --conditions=react-server scripts/publish-legal.ts --clinic demo --kind consent --text scripts/samples/consent-sample.txt`.
 - The server decides the day of a photo (`anglesOpenNow`, `savePatientPhoto`); the client never does.
 - Photos: browser crops to 3:4, resizes to 1600px and re-encodes JPEG (strips EXIF); the server runs
   `sanitizeJpeg` (whole-file walk, drops metadata, nothing after EOI) and stores its output. Saves lock
@@ -79,5 +86,5 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 
 ## Status
 Done: foundations, staff auth (TOTP), patient app v1 (login, film-strip timeline, capture with
-alignment ghost, day view with comparison), patient-side security review fixes. Next: consent screen, clinic dashboard (patients,
-timeline editor, branding), RLS on clinic_id, SMS + email providers, R2 storage.
+alignment ghost, day view with comparison), patient-side security review fixes, consent signing + privacy policy page. Next: clinic dashboard
+(patients incl. signed consents, document upload, timeline editor, branding), RLS on clinic_id, SMS + email providers, R2 storage.

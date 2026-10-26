@@ -424,6 +424,7 @@ export const consents = pgTable(
   },
   (t) => [
     index("consents_patient_idx").on(t.patientId),
+    uniqueIndex("consents_patient_document_uq").on(t.patientId, t.documentId),
     foreignKey({
       name: "consents_patient_fk",
       columns: [t.patientId, t.clinicId],

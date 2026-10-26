@@ -4,10 +4,12 @@ import { Suspense } from "react";
 import { ContentList } from "@/components/patient/content-list";
 import { FilmStrip } from "@/components/patient/film-strip";
 import { angleLabel, formatDayMonth, photoUrl } from "@/components/patient/format";
+import { PatientFooter } from "@/components/patient/patient-footer";
 import { PatientHeader } from "@/components/patient/patient-header";
 import { buildFilmStrip, contentFor, type Frame } from "@/lib/journal/film-strip";
 import { anglesOpenNow } from "@/lib/journal/patient-journal";
-import { requirePatient, type PatientContext } from "@/lib/patient-auth/server";
+import { requireConsentedPatient } from "@/lib/legal/server";
+import type { PatientContext } from "@/lib/patient-auth/server";
 import { photoAngles } from "@/lib/timeline/capture-schedule";
 import { currentPosition, localDate } from "@/lib/timeline/days";
 
@@ -22,7 +24,7 @@ export default function PatientHome({ params }: PageProps<"/c/[slug]">) {
 async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
   await connection(); // sessions and "today" depend on the request time
   const { slug } = await params;
-  const context = await requirePatient(slug);
+  const context = await requireConsentedPatient(slug);
   const now = new Date();
   const frames = buildFilmStrip(context.journal, now);
 
@@ -42,6 +44,7 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
           </section>
         </div>
       </main>
+      <PatientFooter slug={slug} />
     </>
   );
 }

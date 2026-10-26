@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db/client";
 import { MAX_UPLOAD_BYTES } from "@/lib/journal/jpeg";
 import { savePatientPhoto } from "@/lib/journal/patient-journal";
+import { getConsentStatus } from "@/lib/legal/server";
 import { getPatientContext, requestIp } from "@/lib/patient-auth/server";
 import { getStorage } from "@/lib/storage";
 import { isSameOrigin } from "@/lib/net/same-origin";
@@ -15,6 +16,8 @@ export async function POST(request: NextRequest, { params }: RouteContext<"/c/[s
 
   const context = await getPatientContext(slug);
   if (!context) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const consent = await getConsentStatus(context.clinic.id, context.journal.patientId);
+  if (consent.required && !consent.signedAt) return NextResponse.json({ error: "consent_required" }, { status: 409 });
 
   // The body is read into memory, so its size must be declared and small.
   const declared = Number(request.headers.get("content-length"));
