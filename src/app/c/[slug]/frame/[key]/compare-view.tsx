@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { angleLabel, photoUrl } from "@/components/patient/format";
+import { PhotoLogo, type PhotoLogoConfig } from "@/components/patient/photo-logo";
 import type { Frame } from "@/lib/journal/film-strip";
 import { photoAngles, type PhotoAngle } from "@/lib/timeline/capture-schedule";
 
@@ -11,7 +12,17 @@ export type ComparableFrame = { key: string; title: string; photos: Frame["photo
  * One day's photos by angle, with an optional before/after slider against an earlier day.
  * The slider reveals the earlier photo from the right (the reading start in Hebrew).
  */
-export function CompareView({ slug, current, frames }: { slug: string; current: string; frames: ComparableFrame[] }) {
+export function CompareView({
+  slug,
+  current,
+  frames,
+  logo,
+}: {
+  slug: string;
+  current: string;
+  frames: ComparableFrame[];
+  logo: PhotoLogoConfig;
+}) {
   const frame = frames.find((f) => f.key === current)!;
   const available = photoAngles.filter((angle) => frame.photos[angle]);
   const [angle, setAngle] = useState<PhotoAngle>(available[0]);
@@ -21,6 +32,8 @@ export function CompareView({ slug, current, frames }: { slug: string; current: 
   const [split, setSplit] = useState(50);
 
   const photo = frame.photos[angle]!;
+  // Comparison labels sit on the edge the logo doesn't use.
+  const labelEdge = logo?.position.startsWith("top") ? "bottom-2" : "top-2";
   const earlier = against?.photos[angle];
 
   return (
@@ -54,10 +67,11 @@ export function CompareView({ slug, current, frames }: { slug: string; current: 
               <img src={photoUrl(slug, earlier.id)} alt={`${against!.title}, ${angleLabel[angle]}`} className="absolute inset-0 h-full w-full object-cover" />
             </div>
             <div aria-hidden="true" className="absolute inset-y-0 w-0.5 bg-white/90" style={{ left: `${100 - split}%` }} />
-            <span className="absolute right-2 top-2 rounded bg-black/45 px-2 py-0.5 text-[0.8125rem] font-medium text-white">{against!.title}</span>
-            <span className="absolute left-2 top-2 rounded bg-black/45 px-2 py-0.5 text-[0.8125rem] font-medium text-white">{frame.title}</span>
+            <span className={`absolute right-2 ${labelEdge} rounded bg-black/45 px-2 py-0.5 text-[0.8125rem] font-medium text-white`}>{against!.title}</span>
+            <span className={`absolute left-2 ${labelEdge} rounded bg-black/45 px-2 py-0.5 text-[0.8125rem] font-medium text-white`}>{frame.title}</span>
           </>
         )}
+        <PhotoLogo logo={logo} />
       </div>
 
       {candidates.length > 0 && (

@@ -30,14 +30,14 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
 
   return (
     <>
-      <PatientHeader slug={slug} clinicName={context.clinic.name} />
-      <main className="flex-1 pb-12">
+      <PatientHeader slug={slug} clinic={context.clinic} />
+      <main className="p-page flex-1 pb-12">
         <Greeting context={context} now={now} />
         <FilmStrip slug={slug} frames={frames} />
         <div className="mx-auto max-w-md space-y-9 px-5 pt-8">
           <TodayCapture slug={slug} context={context} now={now} frames={frames} />
-          <section>
-            <h2 className="text-[1.25rem] font-semibold">ההנחיות להיום</h2>
+          <section className="p-section">
+            <h2 className="p-heading text-[1.25rem]">ההנחיות להיום</h2>
             <div className="mt-3">
               <ContentList items={contentFor(context.journal.content, todayPosition(context, now))} />
             </div>
@@ -64,7 +64,7 @@ function Greeting({ context, now }: { context: PatientContext; now: Date }) {
       <p className="text-[1.0625rem] text-p-muted">שלום {journal.firstName}</p>
       {position.phase === "post_op" ? (
         <>
-          <h1 className="mt-1 text-[2.75rem] font-semibold leading-none tracking-tight">
+          <h1 className="p-title mt-1 text-[2.75rem] leading-none tracking-tight">
             יום {position.day}
             <span className="ms-3 align-middle text-[1.0625rem] font-normal tracking-normal text-p-muted">להחלמה</span>
           </h1>
@@ -72,7 +72,7 @@ function Greeting({ context, now }: { context: PatientContext; now: Date }) {
         </>
       ) : (
         <>
-          <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-tight">לפני הניתוח</h1>
+          <h1 className="p-title mt-1 text-[2rem] leading-tight tracking-tight">לפני הניתוח</h1>
           {journal.timing.status === "scheduled" && (
             <p className="mt-2 text-[1rem] leading-relaxed text-p-muted">
               הניתוח מתוכנן ל-{formatDayMonth(journal.timing.plannedSurgeryDate)}. צלמו עכשיו תיעוד אחד, כדי שתוכלו להשוות אליו לאורך ההחלמה.
@@ -93,8 +93,8 @@ function TodayCapture({ slug, context, now, frames }: { slug: string; context: P
   if (open.length === 0) {
     const next = frames.find((frame) => frame.status === "upcoming");
     return (
-      <section>
-        <h2 className="text-[1.25rem] font-semibold">אין צילום היום</h2>
+      <section className="p-section">
+        <h2 className="p-heading text-[1.25rem]">אין צילום היום</h2>
         <p className="mt-2 text-[1rem] leading-relaxed text-p-muted">
           {next?.date ? `הצילום הבא ביום ${next.day}, ${formatDayMonth(next.date)}.` : "הצילום הבא יופיע כאן כשיגיע מועדו."}
         </p>
@@ -106,9 +106,9 @@ function TodayCapture({ slug, context, now, frames }: { slug: string; context: P
   const done = photoAngles.filter((angle) => photos[angle]).length;
 
   return (
-    <section>
+    <section className="p-section">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-[1.25rem] font-semibold">הצילום של היום</h2>
+        <h2 className="p-heading text-[1.25rem]">הצילום של היום</h2>
         <p className="text-[0.9375rem] tabular-nums text-p-muted">
           {done} מתוך {photoAngles.length}
         </p>

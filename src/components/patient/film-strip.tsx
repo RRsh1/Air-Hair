@@ -4,14 +4,15 @@ import { formatShortDate, photoUrl } from "./format";
 import { ScrollIntoView } from "./scroll-into-view";
 
 /**
- * The signature of the patient app: recovery days as frames on a strip of film.
+ * The signature of the patient app: recovery days as frames on a strip of film. The clinic theme
+ * picks the template (classic film, minimal cards, polaroid) through the p-strip/p-frame classes.
  * Frames read right to left like the rest of the page; today's frame is scrolled into view.
  */
 export function FilmStrip({ slug, frames }: { slug: string; frames: Frame[] }) {
   const focusKey = frames.find((f) => f.status === "today")?.key ?? frames.findLast((f) => f.status === "done")?.key;
 
   return (
-    <section aria-label="ציר ההחלמה" className="relative bg-p-film py-5">
+    <section aria-label="ציר ההחלמה" className="p-strip relative py-5">
       <Sprockets className="top-1.5" />
       <ol className="flex snap-x gap-2.5 overflow-x-auto px-5 py-1 [scrollbar-width:none]">
         {frames.map((frame) => (
@@ -42,11 +43,11 @@ function FrameCell({ slug, frame, focused }: { slug: string; frame: Frame; focus
 
   const body = (
     <div
-      className={`relative flex h-36 w-[6.5rem] flex-col overflow-hidden rounded-[4px] bg-p-film-frame ${
-        today ? "ring-2 ring-white ring-offset-2 ring-offset-p-film" : ""
-      } ${frame.status === "upcoming" || frame.status === "locked" ? "opacity-45" : ""}`}
+      className={`p-frame relative flex h-36 w-[6.5rem] flex-col ${today ? "p-frame-today" : ""} ${
+        frame.status === "upcoming" || frame.status === "locked" ? "opacity-45" : ""
+      }`}
     >
-      <div className="relative flex-1">
+      <div className="relative flex-1 overflow-hidden rounded-[calc(var(--p-frame-radius)-var(--p-frame-pad)/2)]">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element -- private photo served by an authenticated route
           <img src={photoUrl(slug, thumb.id)} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -54,16 +55,16 @@ function FrameCell({ slug, frame, focused }: { slug: string; frame: Frame; focus
           <span
             aria-hidden="true"
             className="absolute inset-0"
-            style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 7px, rgba(255,255,255,.06) 7px 8px)" }}
+            style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, currentColor 12%, transparent) 7px 8px)" }}
           />
         ) : null}
         {!thumb && today && (
-          <span className="absolute inset-0 flex items-center justify-center text-[0.8125rem] font-semibold text-white">לצלם עכשיו</span>
+          <span className="absolute inset-0 flex items-center justify-center text-[0.8125rem] font-semibold">לצלם עכשיו</span>
         )}
       </div>
-      <div className="flex items-baseline justify-between gap-1 bg-black/25 px-2 py-1.5 text-white">
+      <div className="p-frame-label flex items-baseline justify-between gap-1 rounded-b-[var(--p-frame-radius)] px-2 py-1.5">
         <span className="text-[0.9375rem] font-semibold">{title}</span>
-        <span dir="ltr" className="text-[0.75rem] tabular-nums text-white/70">
+        <span dir="ltr" className="text-[0.75rem] tabular-nums opacity-70">
           {frame.date ? formatShortDate(frame.date) : ""}
         </span>
       </div>
@@ -75,7 +76,7 @@ function FrameCell({ slug, frame, focused }: { slug: string; frame: Frame; focus
     <>
       {focused && <ScrollIntoView targetId={`frame-${frame.key}`} />}
       {clickable ? (
-        <Link href={`/c/${slug}/frame/${frame.key}`} id={`frame-${frame.key}`} aria-label={`${title}, ${statusLabel[frame.status]}`} className="block rounded-[4px]">
+        <Link href={`/c/${slug}/frame/${frame.key}`} id={`frame-${frame.key}`} aria-label={`${title}, ${statusLabel[frame.status]}`} className="block rounded-[var(--p-frame-radius)]">
           {body}
         </Link>
       ) : (
@@ -91,7 +92,7 @@ function Sprockets({ className }: { className: string }) {
   return (
     <span
       aria-hidden="true"
-      className={`pointer-events-none absolute inset-x-0 block h-2.5 ${className}`}
+      className={`p-sprockets pointer-events-none absolute inset-x-0 h-2.5 ${className}`}
       style={{
         backgroundImage: "radial-gradient(circle, color-mix(in srgb, var(--p-bg) 85%, transparent) 0 3px, transparent 3.5px)",
         backgroundSize: "16px 10px",

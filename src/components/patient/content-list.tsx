@@ -19,7 +19,7 @@ export function ContentList({ items }: { items: ContentItem[] }) {
   return (
     <ul className="space-y-3">
       {items.map((item) => (
-        <li key={item.id} className="rounded-p bg-p-surface px-4 py-4">
+        <li key={item.id} className="p-block py-4">
           <p className="text-[0.8125rem] font-medium text-p-accent">{typeLabel[item.contentType]}</p>
           <h3 className="mt-1 text-[1.0625rem] font-semibold">{item.title}</h3>
           <div className="mt-2 space-y-2 text-[1rem] leading-relaxed text-p-ink/85">

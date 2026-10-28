@@ -4,6 +4,8 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { formatDayMonth } from "@/components/patient/format";
 import { LegalText } from "@/components/patient/legal-text";
+import { ClinicMark } from "@/components/patient/patient-header";
+import { getClinicBranding } from "@/lib/theme/server";
 import { getDb } from "@/db/client";
 import { currentDocument } from "@/lib/legal/documents";
 import { getClinic } from "@/lib/patient-auth/server";
@@ -12,7 +14,7 @@ import { localDate } from "@/lib/timeline/days";
 /** The clinic's privacy policy. Public: patients can read it before signing in. */
 export default function PrivacyPage({ params }: PageProps<"/c/[slug]/privacy">) {
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-5 pb-12 pt-5">
+    <main className="p-page mx-auto w-full max-w-md flex-1 px-5 pb-12 pt-5">
       <Suspense fallback={<div className="h-40" aria-hidden="true" />}>
         <PrivacyBody params={params} />
       </Suspense>
@@ -32,8 +34,10 @@ async function PrivacyBody({ params }: Pick<PageProps<"/c/[slug]/privacy">, "par
       <Link href={`/c/${slug}`} className="text-[0.9375rem] font-medium text-p-accent">
         חזרה
       </Link>
-      <p className="mt-6 text-[1rem] font-medium text-p-muted">{clinic.name}</p>
-      <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-tight">מדיניות פרטיות</h1>
+      <div className="mt-6">
+        <ClinicMark slug={slug} name={clinic.name} logoId={(await getClinicBranding(clinic.id)).logoId} />
+      </div>
+      <h1 className="p-title mt-1 text-[2rem] leading-tight tracking-tight">מדיניות פרטיות</h1>
       {document ? (
         <>
           <p className="mt-2 text-[0.9375rem] text-p-muted">

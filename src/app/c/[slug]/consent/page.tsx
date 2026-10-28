@@ -28,10 +28,10 @@ async function ConsentBody({ params, searchParams }: Pick<PageProps<"/c/[slug]/c
 
   return (
     <>
-      <PatientHeader slug={slug} clinicName={context.clinic.name} />
-      <main className="mx-auto w-full max-w-md flex-1 px-5 pb-12 pt-4">
+      <PatientHeader slug={slug} clinic={context.clinic} />
+      <main className="p-page mx-auto w-full max-w-md flex-1 px-5 pb-12 pt-4">
         <p className="text-[1.0625rem] text-p-muted">שלום {context.journal.firstName}</p>
-        <h1 className="mt-1 text-[2rem] font-semibold leading-tight tracking-tight">לפני שמתחילים</h1>
+        <h1 className="p-title mt-1 text-[2rem] leading-tight tracking-tight">לפני שמתחילים</h1>
         <p className="mt-3 text-[1.0625rem] leading-relaxed text-p-muted">
           {document.version > 1 && !updated
             ? "המרפאה עדכנה את מסמך ההסכמה. קראו את הנוסח החדש וחתמו עליו כדי להמשיך."
@@ -43,8 +43,8 @@ async function ConsentBody({ params, searchParams }: Pick<PageProps<"/c/[slug]/c
           </p>
         )}
 
-        <section aria-labelledby="consent-title" className="mt-7 rounded-p bg-p-surface px-4 py-5">
-          <h2 id="consent-title" className="text-[1.125rem] font-semibold">
+        <section aria-labelledby="consent-title" className="p-block mt-7 py-5">
+          <h2 id="consent-title" className="p-heading text-[1.125rem]">
             מסמך הסכמה
           </h2>
           <div className="mt-3">

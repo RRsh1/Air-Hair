@@ -3,11 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { getClinic, getPatientContext } from "@/lib/patient-auth/server";
+import { ClinicMark } from "@/components/patient/patient-header";
+import { getClinicBranding } from "@/lib/theme/server";
 import { PatientLoginForm } from "./login-form";
 
 export default function PatientLoginPage({ params }: PageProps<"/c/[slug]/login">) {
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-10 pt-14">
+    <main className="p-page mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-10 pt-14">
       <Suspense fallback={<div className="h-40" aria-hidden="true" />}>
         <LoginBody params={params} />
       </Suspense>
@@ -24,8 +26,8 @@ async function LoginBody({ params }: Pick<PageProps<"/c/[slug]/login">, "params"
 
   return (
     <>
-      <p className="text-[1rem] font-medium text-p-muted">{clinic.name}</p>
-      <h1 className="mt-2 text-[2rem] font-semibold leading-tight tracking-tight">יומן ההחלמה שלך</h1>
+      <ClinicMark slug={slug} name={clinic.name} logoId={(await getClinicBranding(clinic.id)).logoId} large />
+      <h1 className="p-title mt-2 text-[2rem] leading-tight tracking-tight">יומן ההחלמה שלך</h1>
       <p className="mt-3 text-[1.0625rem] leading-relaxed text-p-muted">
         נכנסים עם תעודת הזהות ומספר הנייד שמסרתם במרפאה. נשלח אליכם קוד בהודעה.
       </p>

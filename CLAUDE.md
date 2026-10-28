@@ -76,7 +76,14 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   the treatment row and re-check the schedule; a file whose DB write fails is deleted. Uploads need a
   same-origin Origin and a Content-Length. Photos are served `no-store` with a sandbox CSP.
   Storage goes through src/lib/storage (local disk in dev, R2 later).
-- Patient UI colors come only from theme tokens (src/lib/theme/patient-theme.ts, `bg-p-*` classes).
+- Patient UI look comes only from the clinic theme (src/lib/theme): colors via `bg-p-*`/`text-p-*`, and
+  element styles via the `p-title`, `p-heading`, `p-block`, `p-section`, `p-strip`, `p-frame`, `p-page`
+  classes (globals.css), which read CSS variables. The layout streams the clinic's published theme as
+  a stylesheet. Don't set a property with a utility on an element whose p-* class owns it.
+  Themes are refused when color pairs fail WCAG contrast (`themeIssues`). Presets: src/lib/theme/presets.ts.
+- Clinic logo: shown in the header/login and overlaid on photos at display time (`PhotoLogo`); one logo
+  per clinic, PNG/JPEG with metadata removed. Until the dashboard editor exists, publish with
+  `npx tsx --conditions=react-server scripts/publish-branding.ts --clinic demo --preset sand --logo scripts/samples/logo-sample.png`.
 - SMS: src/lib/notifications/sms.ts prints to the console in development; in production there is no
   provider yet, so patient login is closed for everyone until one is added.
 
@@ -86,5 +93,6 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 
 ## Status
 Done: foundations, staff auth (TOTP), patient app v1 (login, film-strip timeline, capture with
-alignment ghost, day view with comparison), patient-side security review fixes, consent signing + privacy policy page. Next: clinic dashboard
-(patients incl. signed consents, document upload, timeline editor, branding), RLS on clinic_id, SMS + email providers, R2 storage.
+alignment ghost, day view with comparison), patient-side security review fixes, consent signing + privacy policy page, clinic branding (theme engine, presets, logo + photo overlay).
+Next: clinic dashboard (patients incl. signed consents, document upload, timeline editor, branding editor
+with live preview), RLS on clinic_id, SMS + email providers, R2 storage.

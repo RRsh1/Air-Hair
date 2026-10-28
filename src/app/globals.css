@@ -55,6 +55,80 @@
   }
 }
 
+/*
+ * Patient app elements. Each reads the clinic theme only through CSS variables set on .p-root
+ * (src/lib/theme/patient-theme.ts), so the theme switches block style, dividers, headings and the
+ * film template without component changes. In the components layer: utilities still win, so
+ * elements using these classes must not also set the property with a utility.
+ */
+@layer components {
+  .p-root {
+    background: var(--p-root-bg);
+    font-weight: var(--p-weight-body);
+  }
+  .p-title,
+  .p-heading {
+    font-weight: var(--p-weight-heading);
+  }
+  .p-heading {
+    border-inline-start: var(--p-heading-bar);
+    padding-inline-start: var(--p-heading-bar-pad);
+    border-bottom: var(--p-heading-underline);
+    padding-bottom: var(--p-heading-underline-pad);
+    width: fit-content;
+  }
+  .p-block {
+    background: var(--p-block-bg);
+    border: var(--p-block-border);
+    border-radius: var(--p-radius);
+    padding-inline: var(--p-block-pad-x);
+  }
+  .p-section + .p-section {
+    border-top: var(--p-divider);
+    padding-top: var(--p-divider-gap);
+  }
+  .p-strip {
+    background: var(--p-strip-bg);
+  }
+  .p-sprockets {
+    display: var(--p-sprockets);
+  }
+  .p-frame {
+    background: var(--p-frame-bg);
+    border-radius: var(--p-frame-radius);
+    padding: var(--p-frame-pad);
+    box-shadow: var(--p-frame-shadow);
+    color: var(--p-frame-label-ink);
+  }
+  .p-frame-label {
+    background: var(--p-frame-label-bg);
+    color: var(--p-frame-label-ink);
+  }
+  .p-frame-today {
+    outline: 2px solid var(--p-frame-ring);
+    outline-offset: 3px;
+  }
+  .p-page {
+    animation: var(--p-enter);
+  }
+  .p-logo-overlay {
+    opacity: var(--p-logo-opacity);
+  }
+}
+
+@keyframes p-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes p-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
