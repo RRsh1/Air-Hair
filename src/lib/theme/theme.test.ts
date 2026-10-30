@@ -50,7 +50,7 @@ describe("theme tokens", () => {
     const theme = parsePatientTheme({
       palette: { s6: { hex: "red", name: "x" }, s3: { hex: "#000000", name: "שחור" } },
       radius: 99,
-      blocks: { guidance: { variant: "cards", heading: "s99" }, timeline: { views: ["gallery", "gallery", "film"] } },
+      blocks: { guidance: { variant: "cards", heading: "s99" } },
       nonsense: true,
     });
     expect(theme.palette.s6).toEqual(defaultPatientTheme.palette.s6);
@@ -58,7 +58,6 @@ describe("theme tokens", () => {
     expect(theme.radius).toBe(defaultPatientTheme.radius);
     expect(theme.blocks.guidance.variant).toBe("cards");
     expect(theme.blocks.guidance.heading).toBe(defaultPatientTheme.blocks.guidance.heading);
-    expect(theme.blocks.timeline.views).toEqual(["gallery", "film"]);
     expect(parsePatientTheme(null)).toEqual(defaultPatientTheme);
     expect(parsePatientTheme({ blocks: "x", palette: 3 })).toEqual(defaultPatientTheme);
   });
@@ -90,7 +89,7 @@ describe("theme tokens", () => {
     );
     expect(css.startsWith(".p-root{")).toBe(true);
     expect(css).toContain("--gd-heading:#123456");
-    expect(css).toContain("--tl-film-ink:#ffffff");
+    expect(css).toContain("--tl-tint:#dce8ee");
     expect(css).toContain("--bt-radius:999px");
     expect(css).toContain("--font-p-heading:'Frank Ruhl Libre Variable'");
     expect(css).toContain("html:has(.p-root){font-size:112.5%}");
@@ -125,14 +124,14 @@ describe("clinic branding", () => {
     expect(await publishTheme(db, { clinicId, tokens: themePresets.night.tokens, staffId: null })).toMatchObject({ status: "published", version: 2 });
     const rows = await db.select({ status: clinicThemes.status }).from(clinicThemes).where(eq(clinicThemes.clinicId, clinicId));
     expect(rows.map((r) => r.status).sort()).toEqual(["published", "superseded"]);
-    expect((await loadClinicBranding(db, clinicId)).theme.blocks.timeline.views[0]).toBe("gallery");
+    expect((await loadClinicBranding(db, clinicId)).theme.blocks.guidance.variant).toBe("cards");
     expect((await loadClinicBranding(db, otherClinicId)).theme).toEqual(defaultPatientTheme);
   });
 
   it("refuses an unreadable theme and keeps the current one", async () => {
     const result = await publishTheme(db, { clinicId, tokens: { palette: { s1: { hex: "#ffffff", name: "לבן" }, s3: { hex: "#eeeeee", name: "אפור" } } }, staffId: null });
     expect(result.status).toBe("unreadable");
-    expect((await loadClinicBranding(db, clinicId)).theme.blocks.timeline.views[0]).toBe("gallery");
+    expect((await loadClinicBranding(db, clinicId)).theme.blocks.guidance.variant).toBe("cards");
   });
 
   it("accepts PNG logos with metadata removed, and rejects other files", () => {

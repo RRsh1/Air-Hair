@@ -84,14 +84,6 @@ function block<R extends Record<string, SwatchId>, O extends z.ZodRawShape>(
   });
 }
 
-export const timelineViews = [
-  "film",
-  "journal",
-  "gallery",
-  "calendar",
-  "cards",
-] as const;
-export type TimelineView = (typeof timelineViews)[number];
 export const logoPositions = [
   "bottom-end",
   "bottom-start",
@@ -141,23 +133,7 @@ export const patientThemeSchema = z.object({
       { ink: "s3", accent: "s6", line: "s5", muted: "s4" },
       { variant: field(z.enum(["ticks", "bar", "hidden"]), "ticks") },
     ),
-    timeline: block(
-      {
-        ink: "s3",
-        muted: "s4",
-        accent: "s6",
-        line: "s5",
-        tint: "s7",
-        film: "s8",
-        filmInk: "s2",
-      },
-      {
-        views: field(
-          z.array(z.enum(timelineViews)).min(1).max(timelineViews.length),
-          ["film", "journal", "gallery", "calendar", "cards"],
-        ),
-      },
-    ),
+    timeline: block({ ink: "s3", muted: "s4", accent: "s6", line: "s5", tint: "s7" }, {}),
     capture: block(
       { bg: "s2", ink: "s3", muted: "s4", accent: "s6", line: "s5" },
       { variant: field(z.enum(["tiles", "rows"]), "tiles") },
@@ -197,8 +173,6 @@ export function parsePatientTheme(raw: unknown): PatientTheme {
     raw && typeof raw === "object" ? raw : {},
   );
   const theme = parsed.success ? parsed.data : patientThemeSchema.parse({});
-  // Views are an ordered set: drop repeats, keep the clinic's order (the first is the default).
-  theme.blocks.timeline.views = [...new Set(theme.blocks.timeline.views)];
   return theme;
 }
 
@@ -340,7 +314,6 @@ export function themeIssues(theme: PatientTheme): ThemeIssue[] {
     ["hero", "טקסט משני", b.hero.muted, heroBg, 4.5],
     ["ruler", "תוויות הסרגל", b.ruler.muted, b.base.bg, 4.5],
     ["timeline", "טקסט הציר", b.timeline.ink, b.base.bg, 4.5],
-    ["timeline", "טקסט על הסרט", b.timeline.filmInk, b.timeline.film, 4.5],
     ["capture", "טקסט הצילום היומי", b.capture.ink, captureBg, 4.5],
     ["guidance", "כותרות ההנחיות", b.guidance.heading, guidanceBg, 3],
     ["guidance", "טקסט ההנחיות", b.guidance.ink, guidanceBg, 4.5],

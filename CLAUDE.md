@@ -77,18 +77,20 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   same-origin Origin and a Content-Length. Photos are served `no-store` with a sandbox CSP.
   Storage goes through src/lib/storage (local disk in dev, R2 later).
 - Patient UI design is data (src/lib/theme/patient-theme.ts): a palette of up to 10 named swatches,
-  blocks (base, header, hero, ruler, timeline, capture, guidance, button, footer) that pick swatches
+  blocks (base, header, hero, ruler, timeline/diary, capture, guidance, button, footer) that pick swatches
   for their roles plus a variant, typography (curated Hebrew faces, src/lib/theme/fonts.ts) and logo
   settings. Roles compile to CSS variables `--<block>-<role>` used as Tailwind colors (`text-gd-heading`,
-  `bg-tl-film`…); components never hard-code colors. Block components live in
+  `bg-tl-tint`…); components never hard-code colors. Block components live in
   src/components/patient/blocks and src/components/patient/timeline and are pure (no data fetching),
   so the coming editor preview can render them with a draft theme.
-- Timeline views: film, journal, gallery, calendar, cards. The clinic enables an ordered list (first is
-  the default); the patient can switch, remembered per device. The calendar is a phone-calendar month
-  grid with the selected day's photos, guidance titles and note below it.
+- The timeline is one diary (src/components/patient/timeline/diary.tsx), phone-calendar style, at two
+  levels: an overview of every month of the follow-up (like a year view, with counts), and a month
+  grid with the month's days listed below it; the selected day opens in place (photos, guidance
+  titles, note) and leads to the day page, which steps to the previous/next day. On the home screen
+  today's capture and guidance come first, so the diary's today row shows only the note.
 - Day notes (src/lib/journal/notes.ts): the patient's own note per local date, today or earlier, field-
   encrypted (`journal_notes.body`), audited without text, empty text deletes. Loaded with the journal
-  (`journal.notes`); edited with `NoteEditor` in the calendar and on the day page.
+  (`journal.notes`); edited with `NoteEditor` in the diary and on the day page.
 - Every patient photo goes through `Photo` (src/components/patient/photo.tsx), which overlays the clinic
   logo (hidden on tiny thumbnails via container queries). Downloads burn the logo in client-side
   (`downloadWithLogo`); stored files stay clean.
@@ -106,6 +108,6 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 ## Status
 Done: foundations, staff auth (TOTP), patient app v1 (login, film-strip timeline, capture with
 alignment ghost, day view with comparison), patient-side security review fixes, consent signing + privacy policy page, patient design v2 (block themes, five timeline views,
-logo on every photo + download), phone-style calendar with day notes.
+logo on every photo + download), diary (overview, month + day list, day page) with day notes.
 Next: clinic dashboard (patients incl. signed consents, document upload, timeline editor, branding editor
 with live preview), RLS on clinic_id, SMS + email providers, R2 storage.

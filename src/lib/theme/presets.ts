@@ -13,10 +13,10 @@ type PresetTokens = {
 };
 
 export const themePresets = {
-  /** Surgical ceil blue on porcelain, IBM Plex, film strip first. The Hair&Air default. */
+  /** Surgical ceil blue on porcelain, IBM Plex. The Hair&Air default. */
   scrubs: { label: "חדר טיפולים", tokens: {} },
 
-  /** Stone greys with a forest-green accent, serif headings, a journal-first timeline. */
+  /** Stone greys with a forest-green accent and serif headings. */
   granite: {
     label: "גרניט",
     tokens: {
@@ -35,14 +35,13 @@ export const themePresets = {
       blocks: {
         header: { variant: "centered" },
         hero: { variant: "numeral" },
-        timeline: { views: ["journal", "gallery", "calendar"] },
         guidance: { variant: "rule" },
         button: { shape: "square" },
       },
     },
   },
 
-  /** Night navy with brass, a dark interface; the gallery leads. */
+  /** Night navy with brass, a dark interface. */
   night: {
     label: "לילה",
     tokens: {
@@ -62,7 +61,7 @@ export const themePresets = {
       blocks: {
         base: { accentInk: "s9" },
         header: { variant: "bar", bg: "s8", ink: "s4" },
-        timeline: { views: ["gallery", "cards", "film"], ink: "s3", film: "s8", filmInk: "s3" },
+        timeline: { ink: "s3" },
         capture: { variant: "rows" },
         guidance: { variant: "cards" },
         button: { ink: "s9", shape: "pill" },
@@ -89,7 +88,6 @@ export const themePresets = {
       blocks: {
         hero: { variant: "banner", bg: "s7" },
         ruler: { variant: "bar" },
-        timeline: { views: ["cards", "calendar"] },
         capture: { variant: "rows" },
         guidance: { variant: "cards" },
       },

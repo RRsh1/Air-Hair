@@ -14,6 +14,8 @@ export type TimelineData = {
   /** The patient's notes by date (text only). */
   notes: Record<string, string>;
   content: ContentItem[];
+  /** Length of the follow-up in days after surgery. */
+  totalDays: number;
 };
 
 /** Post-op day number of a calendar date, when the surgery was performed. */

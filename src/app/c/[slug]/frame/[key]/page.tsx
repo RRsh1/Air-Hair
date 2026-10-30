@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { GuidanceBlock } from "@/components/patient/blocks/guidance";
-import { formatDayMonth } from "@/components/patient/format";
+import Link from "next/link";
+import { ChevronEndIcon, ChevronStartIcon } from "@/components/patient/icons";
+import { formatWeekdayDate } from "@/components/patient/timeline/shared";
 import { NoteEditor } from "@/components/patient/note-editor";
 import { PatientHeader } from "@/components/patient/patient-header";
 import { photoLogo } from "@/components/patient/photo";
@@ -29,6 +31,10 @@ async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "p
   const frame = frames.find((f) => f.key === key);
   if (!frame || frame.status === "upcoming" || frame.status === "locked") notFound();
 
+  const openable = frames.filter((f) => f.status !== "upcoming" && f.status !== "locked");
+  const position = openable.findIndex((f) => f.key === frame.key);
+  const previous = openable[position - 1] ?? null;
+  const next = openable[position + 1] ?? null;
   const { theme, logoId } = await getClinicBranding(context.clinic.id);
   const logo = photoLogo(theme, logoId ? logoUrl(slug, logoId) : null);
   const comparable: ComparableFrame[] = frames
@@ -39,9 +45,19 @@ async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "p
     <>
       <PatientHeader slug={slug} clinic={context.clinic} back />
       <main className="mx-auto w-full max-w-md flex-1 pb-12 pt-3">
-        <div className="px-5">
-          <h1 className="p-title p-numeral text-[2.125rem] leading-tight text-hr-ink">{titleOf(frame)}</h1>
-          {frame.date && <p className="mt-1 text-[0.9375rem] text-p-muted">{formatDayMonth(frame.date)}</p>}
+        <div className="flex items-end justify-between gap-3 px-5">
+          <div>
+            <h1 className="p-title p-numeral text-[2.125rem] leading-tight text-hr-ink">{titleOf(frame)}</h1>
+            {frame.date && <p className="mt-1 text-[0.9375rem] text-p-muted">{formatWeekdayDate(frame.date)}</p>}
+          </div>
+          <nav aria-label="מעבר בין ימים" className="flex shrink-0">
+            <DayLink slug={slug} target={previous} label="היום הקודם">
+              <ChevronStartIcon />
+            </DayLink>
+            <DayLink slug={slug} target={next} label="היום הבא">
+              <ChevronEndIcon />
+            </DayLink>
+          </nav>
         </div>
 
         <div className="mt-6 px-5">
@@ -65,5 +81,20 @@ async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "p
         </div>
       </main>
     </>
+  );
+}
+
+function DayLink({ slug, target, label, children }: { slug: string; target: { key: string; kind: string; day: number | null } | null; label: string; children: React.ReactNode }) {
+  if (!target) {
+    return (
+      <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center text-p-line">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link href={`/c/${slug}/frame/${target.key}`} aria-label={`${label}: ${titleOf(target)}`} className="flex h-11 w-11 items-center justify-center rounded-full text-p-accent hover:bg-p-line/40">
+      {children}
+    </Link>
   );
 }

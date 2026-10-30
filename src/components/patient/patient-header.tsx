@@ -14,7 +14,7 @@ export async function PatientHeader({ slug, clinic, back }: { slug: string; clin
       start={
         back ? (
           <Link href={`/c/${slug}`} className="text-[0.9375rem] font-medium text-p-accent">
-            חזרה לציר
+            חזרה ליומן
           </Link>
         ) : undefined
       }

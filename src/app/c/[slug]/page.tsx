@@ -62,20 +62,7 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
             plannedSurgeryDate: planned,
           }}
         />
-        <TimelineBlock
-          config={blocks.timeline}
-          data={{
-            slug,
-            frames,
-            logo,
-            today,
-            surgeryDate,
-            surgeryDone: journal.timing.status === "performed",
-            notes: Object.fromEntries(Object.entries(journal.notes).map(([date, note]) => [date, note.text])),
-            content: journal.content,
-          }}
-        />
-        <div className="space-y-10 pt-9">
+        <div className="space-y-10 pt-2">
           <CaptureBlock
             config={blocks.capture}
             data={{
@@ -90,6 +77,22 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
             config={blocks.guidance}
             items={contentFor(journal.content, position.phase === "pre_op" ? { kind: "pre_op", day: null } : { kind: "post_op", day: position.day })}
           />
+        </div>
+        <div className="pt-12">
+        <TimelineBlock
+          config={blocks.timeline}
+          data={{
+            slug,
+            frames,
+            logo,
+            today,
+            surgeryDate,
+            surgeryDone: journal.timing.status === "performed",
+            notes: Object.fromEntries(Object.entries(journal.notes).map(([date, note]) => [date, note.text])),
+            content: journal.content,
+            totalDays: maxScheduleDay(clinic.settings.followUpMonths),
+          }}
+        />
         </div>
       </main>
       <PatientFooter slug={slug} />
