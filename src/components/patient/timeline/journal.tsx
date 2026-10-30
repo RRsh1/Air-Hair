@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { angleLabel, formatDayMonth, photoUrl } from "@/components/patient/format";
+import { NoteIcon } from "@/components/patient/icons";
 import { Photo } from "@/components/patient/photo";
 import type { Frame } from "@/lib/journal/film-strip";
 import { photoAngles } from "@/lib/timeline/capture-schedule";
@@ -32,15 +33,14 @@ export function JournalView({ data }: { data: TimelineData }) {
   const shown = showAll ? data.frames : data.frames.slice(0, cut);
   const hidden = data.frames.length - shown.length;
 
-  let lastStretch = "";
+  const stretches = shown.map(stretchOf);
   return (
     <div className="mx-auto w-full max-w-md px-5">
       <ol className="relative">
         <span aria-hidden="true" className="absolute bottom-3 start-[4.75rem] top-3 w-px bg-tl-line" />
-        {shown.map((frame) => {
-          const stretch = stretchOf(frame);
-          const opens = stretch !== lastStretch;
-          lastStretch = stretch;
+        {shown.map((frame, i) => {
+          const stretch = stretches[i];
+          const opens = i === 0 || stretch !== stretches[i - 1];
           return (
             <li key={frame.key}>
               {opens && (
@@ -68,6 +68,7 @@ function JournalRow({ data, frame }: { data: TimelineData; frame: Frame }) {
   const openable = isOpenable(frame);
   const today = frame.status === "today";
   const anyPhoto = photoAngles.some((a) => frame.photos[a]);
+  const note = frame.date ? data.notes[frame.date] : undefined;
 
   const node = (
     <span
@@ -114,6 +115,12 @@ function JournalRow({ data, frame }: { data: TimelineData; frame: Frame }) {
         ) : (
           <p className={`pt-1.5 text-[0.9375rem] ${today ? "font-medium text-tl-accent" : "text-tl-muted"}`}>
             {today ? "הצילום של היום מחכה לך" : frame.status === "missed" ? "לא צולם" : statusText[frame.status]}
+          </p>
+        )}
+        {note && (
+          <p className="mt-2 flex gap-1.5 text-[0.875rem] leading-snug text-tl-muted">
+            <NoteIcon className="mt-px h-4 w-4" />
+            <span className="line-clamp-2 text-tl-ink/80">{note}</span>
           </p>
         )}
       </div>

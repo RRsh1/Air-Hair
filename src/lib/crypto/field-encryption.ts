@@ -17,6 +17,7 @@ export type FieldContext =
   | "patients.full_name"
   | "patients.national_id"
   | "patients.phone"
+  | "journal_notes.body"
   | "staff_users.totp_secret";
 
 export type FieldBinding = { context: FieldContext; rowId: string };

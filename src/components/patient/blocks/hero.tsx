@@ -1,4 +1,5 @@
 import { formatDayMonth } from "@/components/patient/format";
+import { formatWeekdayDate } from "@/components/patient/timeline/shared";
 import type { ThemeBlocks } from "@/lib/theme/patient-theme";
 import type { IsoDate } from "@/lib/timeline/days";
 
@@ -22,7 +23,7 @@ export function HeroBlock({ config, data }: { config: ThemeBlocks["hero"]; data:
           <h1 className="p-title mt-1 text-[1.6875rem] leading-tight text-hr-ink">
             <span className="p-numeral">יום {position.day}</span> להחלמה
           </h1>
-          <p className="mt-1 text-[0.9375rem] text-hr-muted">{formatDayMonth(data.today)}</p>
+          <p className="mt-1 text-[0.9375rem] text-hr-muted">{formatWeekdayDate(data.today)}</p>
         </>
       ) : (
         <>
@@ -31,7 +32,7 @@ export function HeroBlock({ config, data }: { config: ThemeBlocks["hero"]; data:
             <span className="p-numeral p-title text-[3.375rem] leading-[0.9]">יום {position.day}</span>
             <span className="text-[1.0625rem] text-hr-muted">להחלמה</span>
           </h1>
-          <p className="mt-3 text-[0.9375rem] text-hr-muted">{formatDayMonth(data.today)}</p>
+          <p className="mt-3 text-[0.9375rem] text-hr-muted">{formatWeekdayDate(data.today)}</p>
         </>
       )
     ) : (

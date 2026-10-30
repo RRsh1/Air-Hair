@@ -20,7 +20,7 @@ export async function PatientHeader({ slug, clinic, back }: { slug: string; clin
       }
       end={
         <form action={signOutAction.bind(null, slug)}>
-          <button type="submit" className="text-[0.9375rem] underline-offset-4 hover:underline">
+          <button type="submit" className="-me-2 flex h-11 items-center px-2 text-[0.9375rem] underline-offset-4 hover:underline">
             יציאה
           </button>
         </form>

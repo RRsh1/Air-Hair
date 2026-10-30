@@ -16,6 +16,7 @@ import {
 } from "../timeline/days";
 import { MAX_DIMENSION, MAX_UPLOAD_BYTES, sanitizeJpeg } from "./jpeg";
 import { parseContentBody, type ContentBody } from "./content-body";
+import { loadDayNotes, type DayNote } from "./notes";
 
 /** Everything the patient app needs about one patient's current treatment. */
 export type PatientJournal = {
@@ -28,6 +29,8 @@ export type PatientJournal = {
   rules: CaptureRule[];
   entries: JournalEntryView[];
   content: ContentItem[];
+  /** The patient's own notes by local date. */
+  notes: Record<IsoDate, DayNote>;
 };
 
 export type JournalEntryView = {
@@ -72,7 +75,7 @@ export async function loadPatientJournal(
 
   const timing = toTiming(row);
 
-  const [ruleRows, contentRows, entries] = await Promise.all([
+  const [ruleRows, contentRows, entries, notes] = await Promise.all([
     db.select().from(captureRules).where(eq(captureRules.versionId, row.versionId)),
     db
       .select()
@@ -80,6 +83,7 @@ export async function loadPatientJournal(
       .where(eq(timelineContent.versionId, row.versionId))
       .orderBy(asc(timelineContent.sortOrder)),
     loadEntries(db, row.treatmentId),
+    loadDayNotes(db, { clinicId: input.clinicId, treatmentId: row.treatmentId, keyring: input.keyring }),
   ]);
 
   const fullName = decryptField(row.fullNameEnc, { context: "patients.full_name", rowId: row.patientId }, input.keyring);
@@ -93,6 +97,7 @@ export async function loadPatientJournal(
     timing,
     rules: ruleRows.map(toCaptureRule),
     entries,
+    notes,
     content: contentRows.map((item) => ({
       id: item.id,
       phase: item.phase,

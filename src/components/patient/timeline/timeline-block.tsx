@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { Segmented } from "@/components/patient/segmented";
 import type { ThemeBlocks, TimelineView } from "@/lib/theme/patient-theme";
 import { CalendarView } from "./calendar";
 import { CardsView } from "./cards";
@@ -31,20 +32,13 @@ const views: Record<TimelineView, (props: { data: TimelineData }) => React.React
  */
 export function TimelineBlock({ config, data }: { config: ThemeBlocks["timeline"]; data: TimelineData }) {
   const enabled = config.views;
-  const [view, setView] = useState<TimelineView>(enabled[0]);
   const storageKey = `hairair:view:${data.slug}`;
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey) as TimelineView | null;
-      if (saved && enabled.includes(saved)) setView(saved);
-    } catch {
-      // Storage unavailable (private mode): keep the clinic's default.
-    }
-  }, [storageKey, enabled]);
+  const stored = useSyncExternalStore(subscribeToStorage, () => readStorage(storageKey), () => null) as TimelineView | null;
+  const [chosen, setChosen] = useState<TimelineView | null>(null);
+  const view = chosen ?? (stored && enabled.includes(stored) ? stored : enabled[0]);
 
   const choose = (next: TimelineView) => {
-    setView(next);
+    setChosen(next);
     try {
       localStorage.setItem(storageKey, next);
     } catch {
@@ -56,26 +50,24 @@ export function TimelineBlock({ config, data }: { config: ThemeBlocks["timeline"
   return (
     <section data-block="timeline" aria-label="ציר ההחלמה" className="pb-2">
       {enabled.length > 1 && (
-        <div className="mx-auto w-full max-w-md px-5 pb-4">
-          <div role="radiogroup" aria-label="תצוגת הציר" className="p-scroll flex gap-1 overflow-x-auto">
-            {enabled.map((v) => (
-              <button
-                key={v}
-                type="button"
-                role="radio"
-                aria-checked={v === view}
-                onClick={() => choose(v)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[0.875rem] transition-colors ${
-                  v === view ? "bg-tl-ink text-p-bg" : "text-tl-muted hover:text-tl-ink"
-                }`}
-              >
-                {viewLabel[v]}
-              </button>
-            ))}
-          </div>
+        <div className="mx-auto w-full max-w-md px-5 pb-5">
+          <Segmented label="תצוגת הציר" options={enabled.map((v) => ({ value: v, label: viewLabel[v] }))} value={view} onChange={choose} />
         </div>
       )}
       <View data={data} />
     </section>
   );
+}
+
+function subscribeToStorage(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
+
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null; // private mode or blocked storage: the clinic's default applies
+  }
 }

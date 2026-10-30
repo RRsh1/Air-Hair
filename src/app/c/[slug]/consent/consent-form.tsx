@@ -13,17 +13,17 @@ export function ConsentForm({ slug, documentId }: { slug: string; documentId: st
     {},
   );
   const [agreed, setAgreed] = useState(false);
-  const pad = useSignaturePad();
+  const { canvasRef, hasInk, hasSignature, clear, toBlob, onPointerDown, onPointerMove, onPointerUp } = useSignaturePad();
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const ready = agreed && pad.hasSignature && !pending;
+  const ready = agreed && hasSignature && !pending;
   const error = localError ?? state.error;
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!ready) return;
     const form = new FormData(event.currentTarget);
-    pad.toBlob().then((blob) => {
+    toBlob().then((blob) => {
       if (!blob) {
         setLocalError("החתימה לא נקלטה. חתמו שוב בתוך המסגרת.");
         return;
@@ -54,8 +54,8 @@ export function ConsentForm({ slug, documentId }: { slug: string; documentId: st
           </p>
           <button
             type="button"
-            onClick={pad.clear}
-            disabled={!pad.hasInk}
+            onClick={clear}
+            disabled={!hasInk}
             className="text-[0.9375rem] text-p-accent underline-offset-4 hover:underline disabled:text-p-muted disabled:no-underline"
           >
             ניקוי
@@ -63,17 +63,17 @@ export function ConsentForm({ slug, documentId }: { slug: string; documentId: st
         </div>
         <div className="relative mt-2 overflow-hidden rounded-p border border-p-line bg-p-surface">
           <canvas
-            ref={pad.canvasRef}
+            ref={canvasRef}
             role="img"
             aria-labelledby="signature-label"
             aria-describedby="signature-hint"
             className="block h-44 w-full touch-none text-p-ink"
-            onPointerDown={pad.onPointerDown}
-            onPointerMove={pad.onPointerMove}
-            onPointerUp={pad.onPointerUp}
-            onPointerCancel={pad.onPointerUp}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
           />
-          {!pad.hasInk && (
+          {!hasInk && (
             <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[1rem] text-p-muted">
               חתמו כאן באצבע
             </span>

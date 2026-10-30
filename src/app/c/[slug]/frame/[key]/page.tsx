@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { GuidanceBlock } from "@/components/patient/blocks/guidance";
 import { formatDayMonth } from "@/components/patient/format";
+import { NoteEditor } from "@/components/patient/note-editor";
 import { PatientHeader } from "@/components/patient/patient-header";
 import { photoLogo } from "@/components/patient/photo";
 import { buildFilmStrip, contentFor } from "@/lib/journal/film-strip";
@@ -52,6 +53,12 @@ async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "p
             <CompareView slug={slug} current={frame.key} frames={comparable} logo={logo} logoOpacity={theme.logo.opacity} />
           )}
         </div>
+
+        {frame.date && (
+          <div className="mt-8 px-5">
+            <NoteEditor slug={slug} date={frame.date} initial={context.journal.notes[frame.date]?.text ?? ""} />
+          </div>
+        )}
 
         <div className="mt-11">
           <GuidanceBlock config={theme.blocks.guidance} items={contentFor(context.journal.content, frame)} title="ההנחיות ליום הזה" />

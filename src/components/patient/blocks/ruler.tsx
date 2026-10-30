@@ -20,14 +20,17 @@ export function RulerBlock({ config, data }: { config: ThemeBlocks["ruler"]; dat
   const total = Math.max(data.totalDays, 30);
   const day = data.day === null ? null : Math.min(Math.max(data.day, 0), total);
   const months = Math.floor(total / DAYS_PER_MONTH);
-  const week = day === null ? 0 : Math.floor(day / 7) + 1;
   const weeks = Math.ceil(total / 7);
   const summary =
     day === null
       ? data.plannedSurgeryDate
         ? `הניתוח ב-${formatDayMonth(data.plannedSurgeryDate)}`
         : "לפני הניתוח"
-      : `שבוע ${Math.min(week, weeks)} מתוך ${weeks}`;
+      : day <= 14
+        ? `השבועיים הראשונים, מתוך ${months} חודשי מעקב`
+        : day <= 30
+          ? `החודש הראשון, מתוך ${months} חודשי מעקב`
+          : `חודש ${Math.min(Math.ceil(day / DAYS_PER_MONTH), months)} מתוך ${months} חודשי מעקב`;
 
   if (config.variant === "bar") {
     const pct = day === null ? 0 : (day / total) * 100;
@@ -52,13 +55,23 @@ export function RulerBlock({ config, data }: { config: ThemeBlocks["ruler"]; dat
       <div aria-hidden="true" className="relative h-7">
         {ticks.map((d, i) => {
           const past = day !== null && d <= day;
-          const isMonth = labels.some((m) => Math.abs(m * DAYS_PER_MONTH - d) < 3.5);
-          const height = 7 + Math.round((i / (ticks.length - 1)) * 13);
+          // Weekly ticks grow slowly toward the end of follow-up, like the hair they measure.
+          const height = 6 + Math.round((i / (ticks.length - 1)) * 8);
           return (
             <span
               key={d}
-              className={`absolute bottom-0 w-px ${past ? "bg-rl-ink" : "bg-rl-line"} ${isMonth ? "w-[1.5px]" : ""}`}
+              className={`absolute bottom-0 w-px ${past ? "bg-rl-ink" : "bg-rl-line"}`}
               style={{ insetInlineStart: `${(d / total) * 100}%`, height }}
+            />
+          );
+        })}
+        {Array.from({ length: months }, (_, i) => i + 1).map((m) => {
+          const at = m * DAYS_PER_MONTH;
+          return (
+            <span
+              key={`m${m}`}
+              className={`absolute bottom-0 h-[18px] w-[1.5px] ${day !== null && at <= day ? "bg-rl-ink" : "bg-rl-muted/50"}`}
+              style={{ insetInlineStart: `${(at / total) * 100}%` }}
             />
           );
         })}

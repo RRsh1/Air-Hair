@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { angleHint, angleLabel, formatDayMonth, photoUrl } from "@/components/patient/format";
+import { CameraIcon, CheckIcon } from "@/components/patient/icons";
 import { Photo, type PhotoLogo } from "@/components/patient/photo";
 import type { Frame } from "@/lib/journal/film-strip";
 import type { ThemeBlocks } from "@/lib/theme/patient-theme";
@@ -47,21 +48,30 @@ export function CaptureBlock({ config, data }: { config: ThemeBlocks["capture"];
 
 function Tiles({ data }: { data: CaptureData }) {
   return (
-    <ul className="mt-3 grid grid-cols-3 gap-2">
+    <ul className="mt-3.5 grid grid-cols-3 gap-2.5">
       {photoAngles.map((angle) => {
         const photo = data.photos[angle];
         const allowed = data.open.includes(angle);
-        const tile = photo ? (
-          <Photo src={photoUrl(data.slug, photo.id)} alt={`צילום ${angleLabel[angle]}`} logo={data.logo} className="aspect-[3/4] rounded-p bg-cp-line">
-            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-2 pb-1.5 pt-7 text-center text-[0.9375rem] font-medium text-white">
-              {angleLabel[angle]}
+        const tile = (
+          <>
+            {photo ? (
+              <Photo src={photoUrl(data.slug, photo.id)} alt={`צילום ${angleLabel[angle]}`} logo={data.logo} className="aspect-[3/4] rounded-p bg-cp-line">
+                <span className="absolute start-2 top-2 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-cp-accent text-p-accent-ink shadow-[0_0_0_2px_rgb(255_255_255/0.85)]">
+                  <CheckIcon className="h-3.5 w-3.5" />
+                </span>
+              </Photo>
+            ) : (
+              <span className="flex aspect-[3/4] items-center justify-center rounded-p border border-cp-line bg-cp-bg">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-cp-accent/10 text-cp-accent">
+                  <CameraIcon className="h-[22px] w-[22px]" />
+                </span>
+              </span>
+            )}
+            <span className="mt-2 block text-[0.9375rem] font-medium leading-tight text-cp-ink">{angleLabel[angle]}</span>
+            <span className={`block text-[0.8125rem] ${photo ? "text-cp-muted" : allowed ? "text-cp-accent" : "text-cp-muted"}`}>
+              {photo ? (allowed ? "צולם, אפשר שוב" : "צולם") : allowed ? "לצלם עכשיו" : "לא היום"}
             </span>
-          </Photo>
-        ) : (
-          <span className="flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-p border-[1.5px] border-dashed border-cp-accent/50 bg-cp-bg text-cp-accent">
-            <CameraIcon />
-            <span className="text-[0.9375rem] font-medium text-cp-ink">{angleLabel[angle]}</span>
-          </span>
+          </>
         );
         return (
           <li key={angle}>
@@ -70,7 +80,7 @@ function Tiles({ data }: { data: CaptureData }) {
                 {tile}
               </Link>
             ) : (
-              <div className="opacity-50">{tile}</div>
+              <div className="opacity-60">{tile}</div>
             )}
           </li>
         );
@@ -91,7 +101,7 @@ function Rows({ data }: { data: CaptureData }) {
               <Photo src={photoUrl(data.slug, photo.id)} alt="" logo={null} className="aspect-[3/4] w-12 shrink-0 rounded-[calc(var(--p-radius)*0.5)]" />
             ) : (
               <span className="flex aspect-[3/4] w-12 shrink-0 items-center justify-center rounded-[calc(var(--p-radius)*0.5)] border-[1.5px] border-dashed border-cp-accent/50 text-cp-accent">
-                <CameraIcon small />
+                <CameraIcon className="h-5 w-5" />
               </span>
             )}
             <span className="min-w-0 flex-1">
@@ -104,14 +114,5 @@ function Rows({ data }: { data: CaptureData }) {
         return <li key={angle}>{allowed ? <Link href={`/c/${data.slug}/capture/${angle}`}>{row}</Link> : row}</li>;
       })}
     </ul>
-  );
-}
-
-function CameraIcon({ small }: { small?: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className={small ? "h-5 w-5" : "h-7 w-7"} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-      <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.4-2h5.8l1.4 2h2.2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z" />
-      <circle cx="12" cy="13" r="3.5" />
-    </svg>
   );
 }

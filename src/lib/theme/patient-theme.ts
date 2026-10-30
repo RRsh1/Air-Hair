@@ -243,8 +243,14 @@ export function themeToCssVars(theme: PatientTheme): Record<string, string> {
     }
   }
   const t = theme.typography;
+  // The segmented control's thumb must read lighter than its tinted track, dark themes included.
+  const surface = swatchHex(theme, theme.blocks.base.surface);
+  const track = swatchHex(theme, theme.blocks.timeline.tint);
+  const ink = swatchHex(theme, theme.blocks.base.ink);
+  const raised = luminance(surface) > luminance(track) ? surface : mixHex(track, ink, 0.2);
   return {
     ...vars,
+    "--p-raised": raised,
     "--p-radius": `${theme.radius}px`,
     "--font-p-heading": fontStack(t.heading),
     "--font-p-body": fontStack(t.body),
@@ -279,6 +285,17 @@ export const usedFonts = (theme: PatientTheme): PatientFontId[] => [
 ];
 
 // ─── Contrast ─────────────────────────────────────────────────────────────────
+
+function mixHex(a: string, b: string, weight: number): string {
+  const pa = parseInt(a.slice(1), 16);
+  const pb = parseInt(b.slice(1), 16);
+  const ch = (n: number, shift: number) => (n >> shift) & 255;
+  const c = (shift: number) =>
+    Math.round(ch(pa, shift) + (ch(pb, shift) - ch(pa, shift)) * weight)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${c(16)}${c(8)}${c(0)}`;
+}
 
 function luminance(color: string): number {
   const n = parseInt(color.slice(1), 16);

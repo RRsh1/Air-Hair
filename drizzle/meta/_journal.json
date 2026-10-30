@@ -57,6 +57,13 @@
       "when": 1793030726685,
       "tag": "0007_consent_once",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793362555860,
+      "tag": "0008_journal_notes",
+      "breakpoints": true
     }
   ]
 }

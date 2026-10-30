@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { angleLabel, photoUrl } from "@/components/patient/format";
 import { Photo } from "@/components/patient/photo";
+import { Segmented } from "@/components/patient/segmented";
 import { photoAngles, type PhotoAngle } from "@/lib/timeline/capture-schedule";
 import { frameHref, frameShortTitle, frameTitle, isOpenable, type TimelineData } from "./shared";
 
@@ -52,22 +53,5 @@ export function GalleryView({ data }: { data: TimelineData }) {
 }
 
 export function AngleSwitch({ value, onChange }: { value: PhotoAngle; onChange: (angle: PhotoAngle) => void }) {
-  return (
-    <div role="radiogroup" aria-label="זווית" className="flex gap-5 border-b border-tl-line">
-      {photoAngles.map((angle) => (
-        <button
-          key={angle}
-          type="button"
-          role="radio"
-          aria-checked={angle === value}
-          onClick={() => onChange(angle)}
-          className={`-mb-px border-b-2 pb-2 text-[0.9375rem] ${
-            angle === value ? "border-tl-accent font-medium text-tl-ink" : "border-transparent text-tl-muted"
-          }`}
-        >
-          {angleLabel[angle]}
-        </button>
-      ))}
-    </div>
-  );
+  return <Segmented label="זווית" options={photoAngles.map((a) => ({ value: a, label: angleLabel[a] }))} value={value} onChange={onChange} />;
 }

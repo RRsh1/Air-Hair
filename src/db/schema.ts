@@ -382,6 +382,34 @@ export const photos = pgTable(
 
 // ─── Legal documents & consent ────────────────────────────────────────────────
 
+/**
+ * The patient's own note on a day of the recovery (how it felt, questions for the clinic).
+ * One per treatment and local date; the text is field-encrypted, bound to the row id.
+ */
+export const journalNotes = pgTable(
+  "journal_notes",
+  {
+    id: id(),
+    clinicId: uuid("clinic_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    treatmentId: uuid("treatment_id")
+      .notNull()
+      .references(() => treatments.id, { onDelete: "cascade" }),
+    noteDate: date("note_date").notNull(),
+    bodyEnc: text("body_enc").notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("journal_notes_treatment_date_uq").on(t.treatmentId, t.noteDate),
+    foreignKey({
+      name: "journal_notes_patient_fk",
+      columns: [t.patientId, t.clinicId],
+      foreignColumns: [patients.id, patients.clinicId],
+    }).onDelete("cascade"),
+  ],
+);
+
 export const legalDocuments = pgTable(
   "legal_documents",
   {

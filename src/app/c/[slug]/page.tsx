@@ -64,7 +64,16 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
         />
         <TimelineBlock
           config={blocks.timeline}
-          data={{ slug, frames, logo, today, surgeryDate, surgeryDone: journal.timing.status === "performed" }}
+          data={{
+            slug,
+            frames,
+            logo,
+            today,
+            surgeryDate,
+            surgeryDone: journal.timing.status === "performed",
+            notes: Object.fromEntries(Object.entries(journal.notes).map(([date, note]) => [date, note.text])),
+            content: journal.content,
+          }}
         />
         <div className="space-y-10 pt-9">
           <CaptureBlock
