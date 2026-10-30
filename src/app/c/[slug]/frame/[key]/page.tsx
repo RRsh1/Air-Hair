@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { ContentList } from "@/components/patient/content-list";
+import { GuidanceBlock } from "@/components/patient/blocks/guidance";
 import { formatDayMonth } from "@/components/patient/format";
 import { PatientHeader } from "@/components/patient/patient-header";
+import { photoLogo } from "@/components/patient/photo";
 import { buildFilmStrip, contentFor } from "@/lib/journal/film-strip";
 import { requireConsentedPatient } from "@/lib/legal/server";
 import { getClinicBranding, logoUrl } from "@/lib/theme/server";
@@ -17,6 +18,8 @@ export default function FramePage({ params }: PageProps<"/c/[slug]/frame/[key]">
   );
 }
 
+const titleOf = (f: { kind: string; day: number | null }) => (f.kind === "pre_op" ? "לפני הניתוח" : f.day === 0 ? "יום הניתוח" : `יום ${f.day}`);
+
 async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "params">) {
   await connection();
   const { slug, key } = await params;
@@ -26,35 +29,33 @@ async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "p
   if (!frame || frame.status === "upcoming" || frame.status === "locked") notFound();
 
   const { theme, logoId } = await getClinicBranding(context.clinic.id);
-  const logo = theme.logoOverlay && logoId ? { src: logoUrl(slug, logoId), position: theme.logoPosition } : null;
-  const title = frame.kind === "pre_op" ? "לפני הניתוח" : `יום ${frame.day}`;
+  const logo = photoLogo(theme, logoId ? logoUrl(slug, logoId) : null);
   const comparable: ComparableFrame[] = frames
     .filter((f) => Object.keys(f.photos).length > 0)
-    .map((f) => ({ key: f.key, title: f.kind === "pre_op" ? "לפני הניתוח" : `יום ${f.day}`, photos: f.photos }));
+    .map((f) => ({ key: f.key, title: titleOf(f), fileTag: f.kind === "pre_op" ? "pre-op" : `day-${f.day}`, photos: f.photos }));
 
   return (
     <>
       <PatientHeader slug={slug} clinic={context.clinic} back />
-      <main className="p-page mx-auto w-full max-w-md flex-1 px-5 pb-12 pt-3">
-        <h1 className="p-title text-[2rem] leading-tight tracking-tight">{title}</h1>
-        {frame.date && <p className="mt-1 text-[1rem] text-p-muted">{formatDayMonth(frame.date)}</p>}
+      <main className="mx-auto w-full max-w-md flex-1 pb-12 pt-3">
+        <div className="px-5">
+          <h1 className="p-title p-numeral text-[2.125rem] leading-tight text-hr-ink">{titleOf(frame)}</h1>
+          {frame.date && <p className="mt-1 text-[0.9375rem] text-p-muted">{formatDayMonth(frame.date)}</p>}
+        </div>
 
-        <div className="mt-6">
+        <div className="mt-6 px-5">
           {Object.keys(frame.photos).length === 0 ? (
             <p className="rounded-p border border-dashed border-p-line px-4 py-6 text-center text-[1rem] text-p-muted">
               {frame.status === "today" ? "עוד לא צילמתם היום." : "לא צולמו תמונות ביום הזה."}
             </p>
           ) : (
-            <CompareView slug={slug} current={frame.key} frames={comparable} logo={logo} />
+            <CompareView slug={slug} current={frame.key} frames={comparable} logo={logo} logoOpacity={theme.logo.opacity} />
           )}
         </div>
 
-        <section className="mt-10">
-          <h2 className="p-heading text-[1.25rem]">ההנחיות ליום הזה</h2>
-          <div className="mt-3">
-            <ContentList items={contentFor(context.journal.content, frame)} />
-          </div>
-        </section>
+        <div className="mt-11">
+          <GuidanceBlock config={theme.blocks.guidance} items={contentFor(context.journal.content, frame)} title="ההנחיות ליום הזה" />
+        </div>
       </main>
     </>
   );

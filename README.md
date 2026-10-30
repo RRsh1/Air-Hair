@@ -44,10 +44,10 @@ npx tsx --conditions=react-server scripts/publish-legal.ts --clinic demo --kind 
 npx tsx --conditions=react-server scripts/publish-legal.ts --clinic demo --kind privacy --text scripts/samples/privacy-sample.txt
 ```
 
-Brand the patient app: a preset (petrol, sand, night, clear), a JSON file of overrides, a logo:
+Brand the patient app: a preset (scrubs, granite, night, clear), a JSON file of overrides, a logo:
 
 ```bash
-npx tsx --conditions=react-server scripts/publish-branding.ts --clinic demo --preset sand --logo scripts/samples/logo-sample.png
+npx tsx --conditions=react-server scripts/publish-branding.ts --clinic demo --preset granite --logo scripts/samples/logo-sample.png
 ```
 
 With `DATABASE_URL=pglite:…`, stop the dev server before running these scripts (one process per database).

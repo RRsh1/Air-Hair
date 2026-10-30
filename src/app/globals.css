@@ -28,7 +28,7 @@
   --color-film: var(--film);
   --font-sans: var(--font-assistant), system-ui, "Arial Hebrew", Arial, sans-serif;
 
-  /* Patient app tokens (set per clinic on the patient layout, see lib/theme/patient-theme.ts). */
+  /* Patient app: one color per block role, set per clinic (src/lib/theme/patient-theme.ts). */
   --color-p-bg: var(--p-bg);
   --color-p-surface: var(--p-surface);
   --color-p-ink: var(--p-ink);
@@ -36,8 +36,37 @@
   --color-p-line: var(--p-line);
   --color-p-accent: var(--p-accent);
   --color-p-accent-ink: var(--p-accent-ink);
-  --color-p-film: var(--p-film);
-  --color-p-film-frame: var(--p-film-frame);
+  --color-hd-bg: var(--hd-bg);
+  --color-hd-ink: var(--hd-ink);
+  --color-hr-bg: var(--hr-bg);
+  --color-hr-ink: var(--hr-ink);
+  --color-hr-muted: var(--hr-muted);
+  --color-hr-accent: var(--hr-accent);
+  --color-rl-ink: var(--rl-ink);
+  --color-rl-accent: var(--rl-accent);
+  --color-rl-line: var(--rl-line);
+  --color-rl-muted: var(--rl-muted);
+  --color-tl-ink: var(--tl-ink);
+  --color-tl-muted: var(--tl-muted);
+  --color-tl-accent: var(--tl-accent);
+  --color-tl-line: var(--tl-line);
+  --color-tl-tint: var(--tl-tint);
+  --color-tl-film: var(--tl-film);
+  --color-tl-film-ink: var(--tl-film-ink);
+  --color-cp-bg: var(--cp-bg);
+  --color-cp-ink: var(--cp-ink);
+  --color-cp-muted: var(--cp-muted);
+  --color-cp-accent: var(--cp-accent);
+  --color-cp-line: var(--cp-line);
+  --color-gd-bg: var(--gd-bg);
+  --color-gd-ink: var(--gd-ink);
+  --color-gd-heading: var(--gd-heading);
+  --color-gd-muted: var(--gd-muted);
+  --color-gd-accent: var(--gd-accent);
+  --color-gd-line: var(--gd-line);
+  --color-bt-bg: var(--bt-bg);
+  --color-bt-ink: var(--bt-ink);
+  --color-ft-ink: var(--ft-ink);
   --radius-p: var(--p-radius);
 }
 
@@ -56,76 +85,65 @@
 }
 
 /*
- * Patient app elements. Each reads the clinic theme only through CSS variables set on .p-root
- * (src/lib/theme/patient-theme.ts), so the theme switches block style, dividers, headings and the
- * film template without component changes. In the components layer: utilities still win, so
- * elements using these classes must not also set the property with a utility.
+ * Patient app. Every color and face comes from the clinic theme through CSS variables on .p-root;
+ * block variants are chosen by components. In the components layer so utilities can still adjust.
  */
 @layer components {
   .p-root {
-    background: var(--p-root-bg);
-    font-weight: var(--p-weight-body);
+    background: var(--p-bg);
+    color: var(--p-ink);
+    font-family: var(--font-p-body);
+    -webkit-font-smoothing: antialiased;
   }
   .p-title,
   .p-heading {
+    font-family: var(--font-p-heading);
     font-weight: var(--p-weight-heading);
+    letter-spacing: -0.01em;
   }
-  .p-heading {
-    border-inline-start: var(--p-heading-bar);
-    padding-inline-start: var(--p-heading-bar-pad);
-    border-bottom: var(--p-heading-underline);
-    padding-bottom: var(--p-heading-underline-pad);
-    width: fit-content;
+  .p-numeral {
+    font-family: var(--font-p-numeral);
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.02em;
   }
-  .p-block {
-    background: var(--p-block-bg);
-    border: var(--p-block-border);
-    border-radius: var(--p-radius);
-    padding-inline: var(--p-block-pad-x);
+  .p-btn {
+    background: var(--bt-bg);
+    color: var(--bt-ink);
+    border-radius: var(--bt-radius);
   }
-  .p-section + .p-section {
-    border-top: var(--p-divider);
-    padding-top: var(--p-divider-gap);
+  /* A photo frame: the logo inside scales with the frame and hides on tiny thumbnails. */
+  .p-photo {
+    container-type: inline-size;
   }
-  .p-strip {
-    background: var(--p-strip-bg);
+  .p-photo-logo {
+    opacity: var(--logo-opacity);
   }
-  .p-sprockets {
-    display: var(--p-sprockets);
+  .p-photo-logo[data-size="s"] {
+    width: 22cqw;
   }
-  .p-frame {
-    background: var(--p-frame-bg);
-    border-radius: var(--p-frame-radius);
-    padding: var(--p-frame-pad);
-    box-shadow: var(--p-frame-shadow);
-    color: var(--p-frame-label-ink);
+  .p-photo-logo[data-size="m"] {
+    width: 30cqw;
   }
-  .p-frame-label {
-    background: var(--p-frame-label-bg);
-    color: var(--p-frame-label-ink);
+  .p-photo-logo[data-size="l"] {
+    width: 40cqw;
   }
-  .p-frame-today {
-    outline: 2px solid var(--p-frame-ring);
-    outline-offset: 3px;
+  @container (max-width: 88px) {
+    .p-photo-logo {
+      display: none;
+    }
   }
-  .p-page {
-    animation: var(--p-enter);
+  .p-hatch {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in srgb, currentColor 14%, transparent) 6px 7px
+    );
   }
-  .p-logo-overlay {
-    opacity: var(--p-logo-opacity);
+  .p-scroll {
+    scrollbar-width: none;
   }
-}
-
-@keyframes p-fade {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes p-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+  .p-scroll::-webkit-scrollbar {
+    display: none;
   }
 }
 

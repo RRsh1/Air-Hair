@@ -4,8 +4,8 @@
  *   npx tsx --conditions=react-server scripts/publish-branding.ts --clinic demo --preset sand
  *   npx tsx --conditions=react-server scripts/publish-branding.ts --clinic demo --theme my-theme.json --logo logo.png
  *
- * --preset starts from a built-in preset (petrol, sand, night, clear); --theme overrides fields
- * from a JSON file (see src/lib/theme/patient-theme.ts). --logo uploads a PNG or JPEG logo.
+ * --preset starts from a built-in preset (scrubs, granite, night, clear); --theme overrides fields
+ * from a JSON file, merged deeply (see src/lib/theme/patient-theme.ts). --logo uploads a PNG or JPEG.
  * A theme with unreadable color pairs is refused and the failing pairs are listed.
  */
 import { config } from "dotenv";
@@ -30,7 +30,7 @@ const { values } = parseArgs({
 
 async function main() {
   if (!values.clinic || (!values.preset && !values.theme && !values.logo)) {
-    throw new Error("Usage: scripts/publish-branding.ts --clinic <slug> [--preset petrol|sand|night|clear] [--theme file.json] [--logo file.png]");
+    throw new Error("Usage: scripts/publish-branding.ts --clinic <slug> [--preset scrubs|granite|night|clear] [--theme file.json] [--logo file.png]");
   }
   if (values.preset && !(values.preset in themePresets)) {
     throw new Error(`Unknown preset "${values.preset}". Presets: ${Object.keys(themePresets).join(", ")}`);
@@ -42,13 +42,13 @@ async function main() {
     if (!clinic) throw new Error(`No clinic with slug "${values.clinic}"`);
 
     if (values.preset || values.theme) {
-      const tokens = {
-        ...(values.preset ? themePresets[values.preset as ThemePresetName] : {}),
-        ...(values.theme ? JSON.parse(readFileSync(values.theme, "utf8")) : {}),
-      };
+      const tokens = deepMerge(
+        values.preset ? themePresets[values.preset as ThemePresetName].tokens : {},
+        values.theme ? JSON.parse(readFileSync(values.theme, "utf8")) : {},
+      );
       const result = await publishTheme(db, { clinicId: clinic.id, tokens, staffId: null });
       if (result.status === "unreadable") {
-        const list = result.issues.map((i) => `  ${i.pair}: ${i.ratio}:1 (needs ${i.required}:1)`).join("\n");
+        const list = result.issues.map((i) => `  ${i.block} / ${i.pair}: ${i.ratio}:1 (needs ${i.required}:1)`).join("\n");
         throw new Error(`Theme not published, these color pairs are hard to read:\n${list}`);
       }
       console.log(`Published theme version ${result.version} for ${clinic.name}.`);
@@ -63,6 +63,14 @@ async function main() {
   } finally {
     await close();
   }
+}
+
+function deepMerge(base: unknown, over: unknown): unknown {
+  const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (!isObject(base) || !isObject(over)) return over === undefined ? base : over;
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(over)) out[key] = deepMerge(base[key], value);
+  return out;
 }
 
 main().catch((error) => {

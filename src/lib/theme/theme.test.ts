@@ -47,13 +47,20 @@ function memoryStorage(): ObjectStorage & { keys: () => string[] } {
 
 describe("theme tokens", () => {
   it("falls back field by field, so one bad value doesn't reset the theme", () => {
-    const theme = parsePatientTheme({ accent: "red", ink: "#000000", radius: 99, filmTemplate: "polaroid", nonsense: true });
-    expect(theme.accent).toBe(defaultPatientTheme.accent);
+    const theme = parsePatientTheme({
+      palette: { s6: { hex: "red", name: "x" }, s3: { hex: "#000000", name: "שחור" } },
+      radius: 99,
+      blocks: { guidance: { variant: "cards", heading: "s99" }, timeline: { views: ["gallery", "gallery", "film"] } },
+      nonsense: true,
+    });
+    expect(theme.palette.s6).toEqual(defaultPatientTheme.palette.s6);
+    expect(theme.palette.s3).toEqual({ hex: "#000000", name: "שחור" });
     expect(theme.radius).toBe(defaultPatientTheme.radius);
-    expect(theme.ink).toBe("#000000");
-    expect(theme.filmTemplate).toBe("polaroid");
+    expect(theme.blocks.guidance.variant).toBe("cards");
+    expect(theme.blocks.guidance.heading).toBe(defaultPatientTheme.blocks.guidance.heading);
+    expect(theme.blocks.timeline.views).toEqual(["gallery", "film"]);
     expect(parsePatientTheme(null)).toEqual(defaultPatientTheme);
-    expect(parsePatientTheme("x")).toEqual(defaultPatientTheme);
+    expect(parsePatientTheme({ blocks: "x", palette: 3 })).toEqual(defaultPatientTheme);
   });
 
   it("measures contrast like WCAG", () => {
@@ -64,28 +71,35 @@ describe("theme tokens", () => {
   it("ships a readable default and readable presets", () => {
     expect(themeIssues(defaultPatientTheme)).toEqual([]);
     for (const [name, preset] of Object.entries(themePresets)) {
-      expect({ name, issues: themeIssues(parsePatientTheme(preset)) }).toEqual({ name, issues: [] });
+      expect({ name, issues: themeIssues(parsePatientTheme(preset.tokens)) }).toEqual({ name, issues: [] });
     }
   });
 
-  it("flags unreadable pairs", () => {
-    const issues = themeIssues(parsePatientTheme({ accent: "#f0f0f0", accentInk: "#ffffff" }));
-    expect(issues.map((i) => i.pair)).toContain("button text on accent");
+  it("flags unreadable pairs per block", () => {
+    const issues = themeIssues(parsePatientTheme({ blocks: { button: { bg: "s7", ink: "s2" } } }));
+    expect(issues).toEqual([expect.objectContaining({ block: "button" })]);
   });
 
-  it("compiles to one stylesheet for .p-root, with template and size switches", () => {
-    const css = themeToCss(parsePatientTheme({ filmTemplate: "minimal", textSize: "large", blocks: "outlined", accent: "#123456" }));
+  it("compiles every block role to a variable, plus type and shape", () => {
+    const css = themeToCss(
+      parsePatientTheme({
+        palette: { s9: { hex: "#123456", name: "כחול" } },
+        blocks: { guidance: { heading: "s9" }, button: { shape: "pill" } },
+        typography: { heading: "frank", scale: "large" },
+      }),
+    );
     expect(css.startsWith(".p-root{")).toBe(true);
-    expect(css).toContain("--p-accent:#123456");
-    expect(css).toContain("--p-sprockets:none");
-    expect(css).toContain("--p-block-bg:transparent");
-    expect(css).toContain("html{font-size:112.5%}");
-    expect(themeToCss(defaultPatientTheme)).not.toContain("html{");
+    expect(css).toContain("--gd-heading:#123456");
+    expect(css).toContain("--tl-film-ink:#ffffff");
+    expect(css).toContain("--bt-radius:999px");
+    expect(css).toContain("--font-p-heading:'Frank Ruhl Libre Variable'");
+    expect(css).toContain("html:has(.p-root){font-size:112.5%}");
   });
 
   it("can't smuggle CSS through token values", () => {
-    const css = themeToCss(parsePatientTheme({ accent: "#fff;}body{display:none" }));
+    const css = themeToCss(parsePatientTheme({ palette: { s1: { hex: "#fff;}body{display:none", name: "x" } }, typography: { heading: "x;}" } }));
     expect(css).not.toContain("display:none");
+    expect(css).not.toContain("x;}");
   });
 });
 
@@ -107,18 +121,18 @@ describe("clinic branding", () => {
   });
 
   it("publishes versions, keeping one published theme per clinic", async () => {
-    expect(await publishTheme(db, { clinicId, tokens: themePresets.sand, staffId: null })).toMatchObject({ status: "published", version: 1 });
-    expect(await publishTheme(db, { clinicId, tokens: themePresets.night, staffId: null })).toMatchObject({ status: "published", version: 2 });
+    expect(await publishTheme(db, { clinicId, tokens: themePresets.granite.tokens, staffId: null })).toMatchObject({ status: "published", version: 1 });
+    expect(await publishTheme(db, { clinicId, tokens: themePresets.night.tokens, staffId: null })).toMatchObject({ status: "published", version: 2 });
     const rows = await db.select({ status: clinicThemes.status }).from(clinicThemes).where(eq(clinicThemes.clinicId, clinicId));
     expect(rows.map((r) => r.status).sort()).toEqual(["published", "superseded"]);
-    expect((await loadClinicBranding(db, clinicId)).theme.filmTemplate).toBe("minimal");
+    expect((await loadClinicBranding(db, clinicId)).theme.blocks.timeline.views[0]).toBe("gallery");
     expect((await loadClinicBranding(db, otherClinicId)).theme).toEqual(defaultPatientTheme);
   });
 
   it("refuses an unreadable theme and keeps the current one", async () => {
-    const result = await publishTheme(db, { clinicId, tokens: { background: "#ffffff", ink: "#eeeeee" }, staffId: null });
+    const result = await publishTheme(db, { clinicId, tokens: { palette: { s1: { hex: "#ffffff", name: "לבן" }, s3: { hex: "#eeeeee", name: "אפור" } } }, staffId: null });
     expect(result.status).toBe("unreadable");
-    expect((await loadClinicBranding(db, clinicId)).theme.filmTemplate).toBe("minimal");
+    expect((await loadClinicBranding(db, clinicId)).theme.blocks.timeline.views[0]).toBe("gallery");
   });
 
   it("accepts PNG logos with metadata removed, and rejects other files", () => {

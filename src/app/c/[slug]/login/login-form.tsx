@@ -92,7 +92,7 @@ function SubmitButton({ pending, children }: { pending: boolean; children: strin
     <button
       type="submit"
       disabled={pending}
-      className="flex h-13 w-full items-center justify-center rounded-p bg-p-accent text-[1.0625rem] font-semibold text-p-accent-ink transition-opacity disabled:opacity-60"
+      className="flex h-13 w-full items-center justify-center p-btn text-[1.0625rem] font-semibold transition-opacity disabled:opacity-60"
     >
       {pending ? "רגע…" : children}
     </button>

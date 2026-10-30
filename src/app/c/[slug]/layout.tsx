@@ -1,3 +1,13 @@
+import "@fontsource/ibm-plex-sans-hebrew/400.css";
+import "@fontsource/ibm-plex-sans-hebrew/500.css";
+import "@fontsource/ibm-plex-sans-hebrew/600.css";
+import "@fontsource/ibm-plex-sans-hebrew/700.css";
+import "@fontsource-variable/heebo";
+import "@fontsource-variable/rubik";
+import "@fontsource-variable/assistant";
+import "@fontsource-variable/frank-ruhl-libre";
+import "@fontsource-variable/noto-serif-hebrew";
+import "@fontsource/secular-one";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { getClinic } from "@/lib/patient-auth/server";
@@ -7,6 +17,7 @@ import { getClinicBranding } from "@/lib/theme/server";
 /**
  * Patient app shell. The default theme is part of the static shell; the clinic's published theme
  * streams in as a stylesheet that overrides it (same selector, later in the document).
+ * Every curated face is declared here; browsers download only the ones the theme uses.
  */
 export default function PatientLayout({ children, params }: LayoutProps<"/c/[slug]">) {
   return (
