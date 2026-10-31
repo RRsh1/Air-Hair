@@ -329,3 +329,37 @@ export function themeIssues(theme: PatientTheme): ThemeIssue[] {
     }))
     .filter((check) => check.ratio < check.required);
 }
+
+// ─── Branch overrides ─────────────────────────────────────────────────────────
+
+type Plain = Record<string, unknown>;
+const isPlain = (v: unknown): v is Plain => typeof v === "object" && v !== null && !Array.isArray(v);
+/** Palette entries ({hex, name} or null) are replaced whole, never merged field by field. */
+const isLeaf = (path: string[]) => path.length === 2 && path[0] === "palette";
+
+/** The values of `theme` that differ from `base`: a branch's override of its organization's theme. */
+export function themeDiff(base: PatientTheme, theme: PatientTheme): Plain {
+  const walk = (a: unknown, b: unknown, path: string[]): unknown => {
+    if (!isLeaf(path) && isPlain(a) && isPlain(b)) {
+      const out: Plain = {};
+      for (const key of Object.keys(b)) {
+        const d = walk(a[key], b[key], [...path, key]);
+        if (d !== undefined) out[key] = d;
+      }
+      return Object.keys(out).length > 0 ? out : undefined;
+    }
+    return JSON.stringify(a) === JSON.stringify(b) ? undefined : b;
+  };
+  return (walk(base, theme, []) as Plain | undefined) ?? {};
+}
+
+/** A branch override laid over its organization's theme, parsed (unknown or invalid values fall back). */
+export function mergeTheme(base: PatientTheme, override: unknown): PatientTheme {
+  const walk = (a: unknown, b: unknown, path: string[]): unknown => {
+    if (isLeaf(path) || !isPlain(a) || !isPlain(b)) return b === undefined ? a : b;
+    const out: Plain = { ...a };
+    for (const key of Object.keys(b)) out[key] = walk(a[key], b[key], [...path, key]);
+    return out;
+  };
+  return parsePatientTheme(isPlain(override) ? walk(base, override, []) : base);
+}

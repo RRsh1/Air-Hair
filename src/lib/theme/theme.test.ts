@@ -7,8 +7,9 @@ import type { Database } from "../../db/types";
 import { buildAuth } from "../auth/build-auth";
 import { provisionClinic } from "../clinic/provision";
 import type { ObjectStorage } from "../storage/types";
-import { inspectLogo, loadClinicBranding, logoObject, publishTheme, uploadLogo } from "./branding";
-import { contrastRatio, defaultPatientTheme, parsePatientTheme, themeIssues, themeToCss } from "./patient-theme";
+import { createBranch } from "../branches/branches";
+import { inspectLogo, loadBrandingScope, loadClinicBranding, logoObject, publishTheme, resetBranchBranding, uploadLogo } from "./branding";
+import { contrastRatio, defaultPatientTheme, mergeTheme, parsePatientTheme, themeDiff, themeIssues, themeToCss } from "./patient-theme";
 import { themePresets } from "./presets";
 
 function png(width: number, height: number, extraChunks: [string, Buffer][] = []): Uint8Array {
@@ -156,5 +157,67 @@ describe("clinic branding", () => {
     expect(await logoObject(db, { clinicId, logoId: first.logoId })).toBeNull();
     expect(await logoObject(db, { clinicId, logoId: second.logoId })).toMatchObject({ contentType: "image/png" });
     expect(await logoObject(db, { clinicId: otherClinicId, logoId: second.logoId })).toBeNull();
+  });
+});
+
+describe("branch branding", () => {
+  let db: Database;
+  let clinicId = "";
+  let branchId = "";
+  const storage = memoryStorage();
+
+  beforeAll(async () => {
+    db = await testDatabase();
+    const auth = buildAuth(db, { secret: "test-secret-test-secret-test-secret-0", baseURL: "http://localhost:3000", secureCookies: false, sendPasswordLink: async () => {} });
+    clinicId = (await provisionClinic(db, auth, { clinicName: "מרפאה", slug: "branch-brand", adminEmail: "bb@test.com", adminName: "א" })).clinicId;
+    const branch = await createBranch(db, { clinicId, name: "סניף צפון" });
+    if (branch.status !== "created") throw new Error("branch");
+    branchId = branch.branchId;
+  }, 60_000);
+
+  it("diffs and merges themes value by value", () => {
+    const base = parsePatientTheme(themePresets.granite.tokens);
+    const changed = parsePatientTheme({ ...base, radius: 20, blocks: { ...base.blocks, guidance: { ...base.blocks.guidance, variant: "cards" } } });
+    const diff = themeDiff(base, changed);
+    expect(diff).toEqual({ radius: 20, blocks: { guidance: { variant: "cards" } } });
+    expect(mergeTheme(base, diff)).toEqual(changed);
+    expect(themeDiff(base, base)).toEqual({});
+  });
+
+  it("stores only the branch's differences, and follows later changes of the organization", async () => {
+    await publishTheme(db, { clinicId, tokens: themePresets.granite.tokens, staffId: null });
+    const org = (await loadClinicBranding(db, clinicId)).theme;
+    const branchTheme = parsePatientTheme({ ...org, blocks: { ...org.blocks, hero: { ...org.blocks.hero, variant: "banner" } } });
+    await publishTheme(db, { clinicId, branchId, tokens: branchTheme, staffId: null });
+
+    const [row] = await db.select({ tokens: clinicThemes.tokens }).from(clinicThemes).where(eq(clinicThemes.branchId, branchId));
+    expect(row.tokens).toEqual({ blocks: { hero: { variant: "banner" } } });
+    expect((await loadClinicBranding(db, clinicId, branchId)).theme.blocks.hero.variant).toBe("banner");
+    expect((await loadClinicBranding(db, clinicId)).theme.blocks.hero.variant).toBe("numeral");
+
+    // The organization moves to another preset: the branch keeps its one difference on top of it.
+    await publishTheme(db, { clinicId, tokens: themePresets.clear.tokens, staffId: null });
+    const branch = (await loadClinicBranding(db, clinicId, branchId)).theme;
+    expect(branch.typography.heading).toBe("rubik");
+    expect(branch.blocks.hero.variant).toBe("banner");
+  });
+
+  it("uses the branch's own logo when it has one, the organization's otherwise", async () => {
+    const orgLogo = await uploadLogo(db, storage, { clinicId, bytes: png(400, 120), staffId: null });
+    if (orgLogo.status !== "saved") throw new Error("logo");
+    expect((await loadClinicBranding(db, clinicId, branchId)).logoId).toBe(orgLogo.logoId);
+
+    const branchLogo = await uploadLogo(db, storage, { clinicId, branchId, bytes: png(500, 150), staffId: null });
+    if (branchLogo.status !== "saved") throw new Error("logo");
+    expect((await loadClinicBranding(db, clinicId, branchId)).logoId).toBe(branchLogo.logoId);
+    expect((await loadClinicBranding(db, clinicId)).logoId).toBe(orgLogo.logoId);
+    expect(await loadBrandingScope(db, clinicId, branchId)).toMatchObject({ hasOverride: true, orgLogoId: orgLogo.logoId, branchLogoId: branchLogo.logoId });
+  });
+
+  it("goes back to the organization's branding on reset", async () => {
+    await resetBranchBranding(db, storage, { clinicId, branchId, staffId: null });
+    const org = await loadClinicBranding(db, clinicId);
+    expect(await loadClinicBranding(db, clinicId, branchId)).toEqual(org);
+    expect((await loadBrandingScope(db, clinicId, branchId)).hasOverride).toBe(false);
   });
 });

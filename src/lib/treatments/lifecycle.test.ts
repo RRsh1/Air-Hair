@@ -118,8 +118,8 @@ describe("a returning patient", () => {
     const current = await journalOf();
     expect(current).toMatchObject({ treatmentId: beardTreatmentId, active: true, entries: [] });
     expect(current.treatments).toEqual([
-      { id: beardTreatmentId, name: "השתלת זקן", branchName: "סניף תל אביב", status: "scheduled", anchorDate: "2026-06-01" },
-      { id: scalpTreatmentId, name: "השתלת שיער", branchName: "סניף ראשי", status: "completed", anchorDate: "2025-06-10" },
+      { id: beardTreatmentId, name: "השתלת זקן", branchId: branch.branchId, branchName: "סניף תל אביב", status: "scheduled", anchorDate: "2026-06-01" },
+      { id: scalpTreatmentId, name: "השתלת שיער", branchId: expect.any(String), branchName: "סניף ראשי", status: "completed", anchorDate: "2025-06-10" },
     ]);
   });
 

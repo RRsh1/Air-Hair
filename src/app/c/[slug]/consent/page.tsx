@@ -1,3 +1,4 @@
+import { selectedBranchId } from "@/lib/journal/patient-journal";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -28,7 +29,7 @@ async function ConsentBody({ params, searchParams }: Pick<PageProps<"/c/[slug]/c
 
   return (
     <>
-      <PatientHeader slug={slug} clinic={context.clinic} />
+      <PatientHeader slug={slug} clinic={context.clinic} branchId={selectedBranchId(context.journal)} />
       <main className="p-page mx-auto w-full max-w-md flex-1 px-5 pb-12 pt-4">
         <p className="text-[1.0625rem] text-p-muted">שלום {context.journal.firstName}</p>
         <h1 className="p-title mt-1 text-[2rem] leading-tight tracking-tight">לפני שמתחילים</h1>

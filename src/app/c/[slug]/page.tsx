@@ -10,7 +10,7 @@ import { photoLogo } from "@/components/patient/photo";
 import { TimelineBlock } from "@/components/patient/timeline/timeline-block";
 import { TreatmentSwitcher } from "@/components/patient/treatment-switcher";
 import { buildFilmStrip, contentFor } from "@/lib/journal/film-strip";
-import { anglesOpenNow } from "@/lib/journal/patient-journal";
+import { anglesOpenNow, selectedBranchId } from "@/lib/journal/patient-journal";
 import { requireConsentedPatient } from "@/lib/legal/server";
 import { getClinicBranding, logoUrl } from "@/lib/theme/server";
 import { maxScheduleDay } from "@/lib/timeline/capture-schedule";
@@ -28,7 +28,7 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
   await connection(); // sessions and "today" depend on the request time
   const { slug } = await params;
   const context = await requireConsentedPatient(slug);
-  const { theme, logoId } = await getClinicBranding(context.clinic.id);
+  const { theme, logoId } = await getClinicBranding(context.clinic.id, selectedBranchId(context.journal));
   const { journal, clinic } = context;
   const blocks = theme.blocks;
 
@@ -45,7 +45,7 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
 
   return (
     <>
-      <PatientHeader slug={slug} clinic={clinic} />
+      <PatientHeader slug={slug} clinic={clinic} branchId={selectedBranchId(journal)} />
       <main className="flex-1">
         <TreatmentSwitcher slug={slug} treatments={journal.treatments} selectedId={journal.treatmentId} />
         <HeroBlock

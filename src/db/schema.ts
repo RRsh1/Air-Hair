@@ -78,53 +78,6 @@ export const clinics = pgTable(
   ],
 );
 
-/** Versioned JSON, always read through parseClinicSettings(). */
-export const clinicSettings = pgTable("clinic_settings", {
-  clinicId: uuid("clinic_id")
-    .primaryKey()
-    .references(() => clinics.id, { onDelete: "cascade" }),
-  settings: jsonb("settings").notNull().default({}),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedBy: uuid("updated_by"),
-});
-
-/** Design tokens for the patient interface; one draft and one published row at a time. */
-export const clinicThemes = pgTable(
-  "clinic_themes",
-  {
-    id: id(),
-    clinicId: uuid("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "cascade" }),
-    status: publishStatus("status").notNull().default("draft"),
-    version: integer("version").notNull(),
-    tokens: jsonb("tokens").notNull(),
-    createdAt: createdAt(),
-    publishedAt: timestamp("published_at", { withTimezone: true }),
-  },
-  (t) => [
-    uniqueIndex("clinic_themes_clinic_version_uq").on(t.clinicId, t.version),
-    uniqueIndex("clinic_themes_one_published_uq").on(t.clinicId).where(sql`${t.status} = 'published'`),
-    uniqueIndex("clinic_themes_one_draft_uq").on(t.clinicId).where(sql`${t.status} = 'draft'`),
-  ],
-);
-
-export const clinicAssets = pgTable(
-  "clinic_assets",
-  {
-    id: id(),
-    clinicId: uuid("clinic_id")
-      .notNull()
-      .references(() => clinics.id, { onDelete: "cascade" }),
-    kind: assetKind("kind").notNull(),
-    storageKey: text("storage_key").notNull(),
-    contentType: text("content_type").notNull(),
-    bytes: integer("bytes").notNull(),
-    createdAt: createdAt(),
-  },
-  (t) => [index("clinic_assets_clinic_kind_idx").on(t.clinicId, t.kind)],
-);
-
 // ─── Branches ─────────────────────────────────────────────────────────────────
 
 /**
@@ -147,6 +100,74 @@ export const branches = pgTable(
     uniqueIndex("branches_id_clinic_uq").on(t.id, t.clinicId),
     uniqueIndex("branches_one_main_uq").on(t.clinicId).where(sql`${t.isMain}`),
     check("branches_main_active_ck", sql`not (${t.isMain} and ${t.archivedAt} is not null)`),
+  ],
+);
+
+/** Versioned JSON, always read through parseClinicSettings(). */
+export const clinicSettings = pgTable("clinic_settings", {
+  clinicId: uuid("clinic_id")
+    .primaryKey()
+    .references(() => clinics.id, { onDelete: "cascade" }),
+  settings: jsonb("settings").notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid("updated_by"),
+});
+
+/**
+ * Design tokens for the patient interface. branch_id null: the organization's theme (complete).
+ * branch_id set: that branch's override, holding only the values that differ from the organization's.
+ * One published (and one draft) row per scope.
+ */
+export const clinicThemes = pgTable(
+  "clinic_themes",
+  {
+    id: id(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id"),
+    status: publishStatus("status").notNull().default("draft"),
+    version: integer("version").notNull(),
+    tokens: jsonb("tokens").notNull(),
+    createdAt: createdAt(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("clinic_themes_clinic_version_uq").on(t.clinicId, t.version),
+    uniqueIndex("clinic_themes_one_published_uq").on(t.clinicId).where(sql`${t.status} = 'published' and ${t.branchId} is null`),
+    uniqueIndex("clinic_themes_one_draft_uq").on(t.clinicId).where(sql`${t.status} = 'draft' and ${t.branchId} is null`),
+    uniqueIndex("clinic_themes_branch_published_uq").on(t.branchId).where(sql`${t.status} = 'published' and ${t.branchId} is not null`),
+    uniqueIndex("clinic_themes_branch_draft_uq").on(t.branchId).where(sql`${t.status} = 'draft' and ${t.branchId} is not null`),
+    foreignKey({
+      name: "clinic_themes_branch_fk",
+      columns: [t.branchId, t.clinicId],
+      foreignColumns: [branches.id, branches.clinicId],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const clinicAssets = pgTable(
+  "clinic_assets",
+  {
+    id: id(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    kind: assetKind("kind").notNull(),
+    /** Null: the organization's asset. Set: a branch's own (e.g. its logo), used instead of the organization's. */
+    branchId: uuid("branch_id"),
+    storageKey: text("storage_key").notNull(),
+    contentType: text("content_type").notNull(),
+    bytes: integer("bytes").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("clinic_assets_clinic_kind_idx").on(t.clinicId, t.kind),
+    foreignKey({
+      name: "clinic_assets_branch_fk",
+      columns: [t.branchId, t.clinicId],
+      foreignColumns: [branches.id, branches.clinicId],
+    }).onDelete("cascade"),
   ],
 );
 

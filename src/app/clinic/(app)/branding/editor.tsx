@@ -22,7 +22,7 @@ import {
   type PatientTheme,
   type SwatchId,
 } from "@/lib/theme/patient-theme";
-import { publishThemeAction } from "./actions";
+import { publishThemeAction, resetBranchAction } from "./actions";
 import { blockLabels, blockOrder, optionLabels, positionLabels, roleLabels, scaleLabels, variantLabels } from "./labels";
 import { ThemePreview } from "./preview";
 
@@ -42,12 +42,15 @@ export function BrandingEditor({
   clinicName,
   slug,
   logoId: initialLogoId,
+  branch,
 }: {
   published: PatientTheme;
   presets: Preset[];
   clinicName: string;
   slug: string;
   logoId: string | null;
+  /** Editing one branch's branding: changes are stored as its differences from the organization. */
+  branch: { id: string; name: string; hasOverride: boolean; ownLogo: boolean } | null;
 }) {
   const [baseline, setBaseline] = useState(published);
   const [theme, setThemeRaw] = useState(published);
@@ -76,16 +79,37 @@ export function BrandingEditor({
 
   const publish = () =>
     startPublish(async () => {
-      const result = await publishThemeAction(theme);
+      const result = await publishThemeAction(theme, branch?.id ?? null);
       if (result.status === "published") {
         setBaseline(theme);
         setStatus({ kind: "published", message: `גרסה ${result.version} פורסמה למטופלים` });
       } else setStatus({ kind: "error", message: result.message });
     });
 
+  const reset = () =>
+    startPublish(async () => {
+      if (!branch) return;
+      const result = await resetBranchAction(branch.id);
+      setStatus(result.status === "error" ? { kind: "error", message: result.message } : { kind: "published", message: "הסניף חזר למיתוג של הארגון" });
+    });
+
   return (
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_auto]">
       <div className="min-w-0">
+        {branch && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-petrol/25 bg-petrol/5 px-4 py-3">
+            <p className="text-[0.9375rem] text-ink">
+              {branch.hasOverride || branch.ownLogo
+                ? `לסניף ${branch.name} יש מיתוג משלו. מה שלא שונה כאן נלקח ממיתוג הארגון ומתעדכן איתו.`
+                : `${branch.name} משתמש עכשיו במיתוג של הארגון. כל שינוי שתפרסמו כאן יחול רק על המטופלים של הסניף.`}
+            </p>
+            {(branch.hasOverride || branch.ownLogo) && (
+              <button type="button" onClick={reset} disabled={publishing} className="h-9 rounded-md border border-line bg-surface px-3 text-[0.9375rem] hover:border-signal hover:text-signal disabled:opacity-60">
+                חזרה למיתוג הארגון
+              </button>
+            )}
+          </div>
+        )}
         <div className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 bg-paper px-1 pb-3 pt-1">
           <nav aria-label="חלקי העורך" className="flex rounded-md border border-line bg-surface p-1">
             {tabs.map((t) => (
@@ -112,7 +136,7 @@ export function BrandingEditor({
               disabled={!dirty || issues.length > 0 || publishing}
               className="h-10 rounded-md bg-petrol px-5 font-semibold text-white hover:bg-petrol-strong disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {publishing ? "מפרסם…" : "פרסום למטופלים"}
+              {publishing ? "מפרסם…" : branch ? "פרסום לסניף" : "פרסום למטופלים"}
             </button>
           </div>
         </div>
@@ -143,7 +167,7 @@ export function BrandingEditor({
         {tab === "colors" && <ColorsPanel theme={theme} setTheme={setTheme} />}
         {tab === "type" && <TypePanel theme={theme} setTheme={setTheme} />}
         {tab === "blocks" && <BlocksPanel theme={theme} selected={selected} onSelect={setSelected} setBlock={setBlock} />}
-        {tab === "logo" && <LogoPanel theme={theme} setTheme={setTheme} logoSrc={logoSrc} onUploaded={setLogoId} />}
+        {tab === "logo" && <LogoPanel theme={theme} setTheme={setTheme} logoSrc={logoSrc} onUploaded={setLogoId} branchId={branch?.id ?? null} />}
       </div>
 
       <div className="xl:sticky xl:top-6 xl:self-start">
@@ -385,11 +409,13 @@ function LogoPanel({
   setTheme,
   logoSrc,
   onUploaded,
+  branchId,
 }: {
   theme: PatientTheme;
   setTheme: (u: (t: PatientTheme) => unknown) => void;
   logoSrc: string | null;
   onUploaded: (id: string) => void;
+  branchId: string | null;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -400,6 +426,7 @@ function LogoPanel({
     setError(null);
     const body = new FormData();
     body.set("logo", file);
+    if (branchId) body.set("branchId", branchId);
     const response = await fetch("/clinic/branding/logo", { method: "POST", body }).catch(() => null);
     const result = response ? ((await response.json().catch(() => null)) as { status: string; logoId?: string; message?: string } | null) : null;
     setUploading(false);
@@ -409,7 +436,14 @@ function LogoPanel({
 
   return (
     <div className="space-y-4">
-      <Panel title="הלוגו של המרפאה" about="מופיע בראש המסך ועל כל תמונה של המטופל. הקבצים המקוריים נשמרים נקיים, והלוגו נצרב רק בהורדה.">
+      <Panel
+        title={branchId ? "הלוגו של הסניף" : "הלוגו של המרפאה"}
+        about={
+          branchId
+            ? "לוגו שמעלים כאן מחליף את לוגו הארגון רק אצל המטופלים של הסניף. בלי לוגו משלו, הסניף משתמש בלוגו של הארגון."
+            : "מופיע בראש המסך ועל כל תמונה של המטופל. הקבצים המקוריים נשמרים נקיים, והלוגו נצרב רק בהורדה."
+        }
+      >
         <div className="flex flex-wrap items-center gap-5">
           <div className="flex h-20 w-44 items-center justify-center rounded-md border border-line bg-paper px-3">
             {logoSrc ? (

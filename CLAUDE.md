@@ -88,6 +88,12 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   re-checked on the server). The live preview renders the real patient blocks with sample data
   (`sample.ts`, photos from public/branding-preview via PREVIEW_SLUG in photoUrl) in a same-origin iframe
   at phone width, with the dashboard's stylesheets copied in; clicking a block selects it.
+- Branch branding (?branch=<id> in the editor; the main branch is the organization): clinic_themes /
+  clinic_assets rows with branch_id hold a branch's override and own logo. A branch override stores only
+  its differences from the organization (`themeDiff`), merged at read time (`mergeTheme`), so it follows
+  later organization changes; a merged result that fails contrast falls back to the organization's theme.
+  `resetBranchBranding` drops the override and logo. Patient pages pass the selected treatment's branch
+  (`selectedBranchId(journal)`) to `getClinicBranding`; login and privacy pages use the organization's.
 - Local dashboard check: REQUIRE_STAFF_2FA=false in .env.local (dev only) and a known admin password.
 
 ## Organization, branches, catalog
@@ -161,6 +167,7 @@ logo on every photo + download), diary (overview, month + day list, day page) wi
 platform foundation (branches, procedure catalog, treatment lifecycle, returning patients, treatment switcher),
 dashboard slice 1 (shell, patient register, new patient, patient card with treatments, contact sheet, notes,
 signed documents, lifecycle actions, returning patient), Puck RTL spike (branch spike/puck, go),
-dashboard slice 2 (capability-based nav, settings, branches, legal documents with coverage), branding editor.
-Next: per-branch branding override; staff users + branch assignment (touches auth/authz), then leads/CRM, reports, landing page builder,
+dashboard slice 2 (capability-based nav, settings, branches, legal documents with coverage), branding editor
+with per-branch override.
+Next: staff users + branch assignment (touches auth/authz), then leads/CRM, reports, landing page builder,
 operator console. Also: RLS on clinic_id, SMS + email providers, R2 storage, per-procedure capture angles.

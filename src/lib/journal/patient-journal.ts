@@ -35,6 +35,7 @@ export type TreatmentSummary = {
   id: string;
   /** The clinic's name for the procedure, e.g. "השתלת זקן". */
   name: string;
+  branchId: string;
   branchName: string;
   status: TreatmentStatus;
   /** Day 0 once performed, the planned date before. */
@@ -80,6 +81,11 @@ export type ContentItem = {
   body: ContentBody;
 };
 
+/** The branch of the treatment the patient is looking at (its branding applies). */
+export function selectedBranchId(journal: PatientJournal): string | null {
+  return journal.treatments.find((t) => t.id === journal.treatmentId)?.branchId ?? null;
+}
+
 export async function loadPatientJournal(
   db: Database,
   input: { clinicId: string; patientId: string; treatmentId?: string | null; keyring?: Keyring },
@@ -96,6 +102,7 @@ export async function loadPatientJournal(
     .select({
       id: treatments.id,
       name: timelineTemplates.name,
+      branchId: treatments.branchId,
       branchName: branches.name,
       status: treatments.status,
       planned: treatments.plannedSurgeryDate,
@@ -136,6 +143,7 @@ export async function loadPatientJournal(
     treatments: ordered.map((item) => ({
       id: item.id,
       name: item.name,
+      branchId: item.branchId,
       branchName: item.branchName,
       status: item.status,
       anchorDate: (item.actual ?? item.planned) as IsoDate,

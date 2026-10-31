@@ -4,8 +4,19 @@ import { HeaderBlock } from "@/components/patient/blocks/header";
 import { getClinicBranding, logoUrl } from "@/lib/theme/server";
 
 /** The header on signed-in pages: clinic mark (or a back link) and sign-out. */
-export async function PatientHeader({ slug, clinic, back }: { slug: string; clinic: { id: string; name: string }; back?: boolean }) {
-  const { theme, logoId } = await getClinicBranding(clinic.id);
+export async function PatientHeader({
+  slug,
+  clinic,
+  branchId = null,
+  back,
+}: {
+  slug: string;
+  clinic: { id: string; name: string };
+  /** Branch of the treatment shown, for its own logo and theme. */
+  branchId?: string | null;
+  back?: boolean;
+}) {
+  const { theme, logoId } = await getClinicBranding(clinic.id, branchId);
   return (
     <HeaderBlock
       config={theme.blocks.header}

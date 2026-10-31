@@ -10,7 +10,8 @@ import "@fontsource-variable/noto-serif-hebrew";
 import "@fontsource/secular-one";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { getClinic } from "@/lib/patient-auth/server";
+import { selectedBranchId } from "@/lib/journal/patient-journal";
+import { getClinic, getPatientContext } from "@/lib/patient-auth/server";
 import { defaultPatientTheme, themeToCss } from "@/lib/theme/patient-theme";
 import { getClinicBranding } from "@/lib/theme/server";
 
@@ -33,8 +34,11 @@ export default function PatientLayout({ children, params }: LayoutProps<"/c/[slu
 
 async function ClinicTheme({ params }: Pick<LayoutProps<"/c/[slug]">, "params">) {
   await connection();
-  const clinic = await getClinic((await params).slug);
+  const { slug } = await params;
+  const clinic = await getClinic(slug);
   if (!clinic) return null;
-  const { theme } = await getClinicBranding(clinic.id);
+  // Signed in: the branding of the branch the patient's treatment belongs to (if it has its own).
+  const context = await getPatientContext(slug);
+  const { theme } = await getClinicBranding(clinic.id, context ? selectedBranchId(context.journal) : null);
   return <style>{themeToCss(theme)}</style>;
 }

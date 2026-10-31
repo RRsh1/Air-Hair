@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db/client";
 import { getStaffAccess } from "@/lib/auth/server";
 import { canStaff } from "@/lib/authz/policy";
+import { activeBranchId } from "@/lib/branches/branches";
 import { isSameOrigin } from "@/lib/net/same-origin";
 import { getStorage } from "@/lib/storage";
 import { MAX_LOGO_BYTES, uploadLogo } from "@/lib/theme/branding";
@@ -27,8 +28,13 @@ export async function POST(request: NextRequest) {
   const form = await request.formData().catch(() => null);
   const file = form?.get("logo");
   if (!(file instanceof Blob) || file.size === 0) return NextResponse.json({ status: "invalid", message: reasons.format }, { status: 400 });
+  // Optional: a branch's own logo, used instead of the organization's for that branch's patients.
+  const requestedBranch = form?.get("branchId");
+  const branchId = typeof requestedBranch === "string" && requestedBranch ? await activeBranchId(getDb(), access.actor.clinicId, requestedBranch) : null;
+  if (requestedBranch && !branchId) return NextResponse.json({ status: "invalid", message: "הסניף לא נמצא." }, { status: 400 });
   const result = await uploadLogo(getDb(), getStorage(), {
     clinicId: access.actor.clinicId,
+    branchId,
     bytes: new Uint8Array(await file.arrayBuffer()),
     staffId: access.actor.staffId,
   });

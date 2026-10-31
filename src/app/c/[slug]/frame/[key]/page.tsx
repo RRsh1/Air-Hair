@@ -9,6 +9,7 @@ import { ArchivedNote, NoteEditor } from "@/components/patient/note-editor";
 import { PatientHeader } from "@/components/patient/patient-header";
 import { photoLogo } from "@/components/patient/photo";
 import { buildFilmStrip, contentFor } from "@/lib/journal/film-strip";
+import { selectedBranchId } from "@/lib/journal/patient-journal";
 import { requireConsentedPatient } from "@/lib/legal/server";
 import { getClinicBranding, logoUrl } from "@/lib/theme/server";
 import { CompareView, type ComparableFrame } from "./compare-view";
@@ -35,7 +36,7 @@ async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "p
   const position = openable.findIndex((f) => f.key === frame.key);
   const previous = openable[position - 1] ?? null;
   const next = openable[position + 1] ?? null;
-  const { theme, logoId } = await getClinicBranding(context.clinic.id);
+  const { theme, logoId } = await getClinicBranding(context.clinic.id, selectedBranchId(context.journal));
   const logo = photoLogo(theme, logoId ? logoUrl(slug, logoId) : null);
   const comparable: ComparableFrame[] = frames
     .filter((f) => Object.keys(f.photos).length > 0)
@@ -43,7 +44,7 @@ async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "p
 
   return (
     <>
-      <PatientHeader slug={slug} clinic={context.clinic} back />
+      <PatientHeader slug={slug} clinic={context.clinic} branchId={selectedBranchId(context.journal)} back />
       <main className="mx-auto w-full max-w-md flex-1 pb-12 pt-3">
         <div className="flex items-end justify-between gap-3 px-5">
           <div>
