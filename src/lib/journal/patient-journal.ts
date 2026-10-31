@@ -1,6 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { auditLog, captureRules, clinics, journalEntries, patients, photos, timelineContent, treatments } from "../../db/schema";
+import {
+  auditLog,
+  branches,
+  captureRules,
+  clinics,
+  journalEntries,
+  patients,
+  photos,
+  timelineContent,
+  timelineTemplates,
+  treatments,
+} from "../../db/schema";
 import type { Database } from "../../db/types";
 import { decryptField, type Keyring } from "../crypto";
 import type { ObjectStorage } from "../storage/types";
@@ -17,14 +28,33 @@ import {
 import { MAX_DIMENSION, MAX_UPLOAD_BYTES, sanitizeJpeg } from "./jpeg";
 import { parseContentBody, type ContentBody } from "./content-body";
 import { loadDayNotes, type DayNote } from "./notes";
+import { isActiveStatus, type TreatmentStatus } from "../treatments/lifecycle";
 
-/** Everything the patient app needs about one patient's current treatment. */
+/** One of the patient's treatments, for the treatment switcher. */
+export type TreatmentSummary = {
+  id: string;
+  /** The clinic's name for the procedure, e.g. "השתלת זקן". */
+  name: string;
+  branchName: string;
+  status: TreatmentStatus;
+  /** Day 0 once performed, the planned date before. */
+  anchorDate: IsoDate;
+};
+
+/**
+ * Everything the patient app needs about one of the patient's treatments (the selected one, or
+ * the default: the newest active treatment, else the newest of all).
+ */
 export type PatientJournal = {
   patientId: string;
   firstName: string;
   clinicId: string;
   timeZone: string;
   treatmentId: string;
+  /** Every treatment of the patient, active ones first, newest first. */
+  treatments: TreatmentSummary[];
+  /** Scheduled or performed. A completed or cancelled treatment is a read-only archive. */
+  active: boolean;
   timing: TreatmentTiming;
   rules: CaptureRule[];
   entries: JournalEntryView[];
@@ -52,27 +82,36 @@ export type ContentItem = {
 
 export async function loadPatientJournal(
   db: Database,
-  input: { clinicId: string; patientId: string; keyring?: Keyring },
+  input: { clinicId: string; patientId: string; treatmentId?: string | null; keyring?: Keyring },
 ): Promise<PatientJournal | null> {
-  const [row] = await db
+  const [person] = await db
+    .select({ patientId: patients.id, fullNameEnc: patients.fullNameEnc, timeZone: clinics.timeZone })
+    .from(patients)
+    .innerJoin(clinics, eq(clinics.id, patients.clinicId))
+    .where(and(eq(patients.id, input.patientId), eq(patients.clinicId, input.clinicId)))
+    .limit(1);
+  if (!person) return null;
+
+  const rows = await db
     .select({
-      patientId: patients.id,
-      fullNameEnc: patients.fullNameEnc,
-      timeZone: clinics.timeZone,
-      treatmentId: treatments.id,
+      id: treatments.id,
+      name: timelineTemplates.name,
+      branchName: branches.name,
       status: treatments.status,
       planned: treatments.plannedSurgeryDate,
       actual: treatments.actualSurgeryDate,
       versionId: treatments.versionId,
+      createdAt: treatments.createdAt,
     })
-    .from(patients)
-    .innerJoin(clinics, eq(clinics.id, patients.clinicId))
-    .innerJoin(treatments, and(eq(treatments.patientId, patients.id), eq(treatments.clinicId, patients.clinicId)))
-    .where(and(eq(patients.id, input.patientId), eq(patients.clinicId, input.clinicId)))
-    .orderBy(desc(treatments.createdAt))
-    .limit(1);
-  if (!row) return null;
+    .from(treatments)
+    .innerJoin(timelineTemplates, eq(timelineTemplates.id, treatments.templateId))
+    .innerJoin(branches, eq(branches.id, treatments.branchId))
+    .where(and(eq(treatments.patientId, person.patientId), eq(treatments.clinicId, input.clinicId)))
+    .orderBy(desc(treatments.createdAt));
+  if (rows.length === 0) return null;
 
+  const ordered = [...rows.filter((row) => isActiveStatus(row.status)), ...rows.filter((row) => !isActiveStatus(row.status))];
+  const row = ordered.find((candidate) => candidate.id === input.treatmentId) ?? ordered[0];
   const timing = toTiming(row);
 
   const [ruleRows, contentRows, entries, notes] = await Promise.all([
@@ -82,18 +121,26 @@ export async function loadPatientJournal(
       .from(timelineContent)
       .where(eq(timelineContent.versionId, row.versionId))
       .orderBy(asc(timelineContent.sortOrder)),
-    loadEntries(db, row.treatmentId),
-    loadDayNotes(db, { clinicId: input.clinicId, treatmentId: row.treatmentId, keyring: input.keyring }),
+    loadEntries(db, row.id),
+    loadDayNotes(db, { clinicId: input.clinicId, treatmentId: row.id, keyring: input.keyring }),
   ]);
 
-  const fullName = decryptField(row.fullNameEnc, { context: "patients.full_name", rowId: row.patientId }, input.keyring);
+  const fullName = decryptField(person.fullNameEnc, { context: "patients.full_name", rowId: person.patientId }, input.keyring);
 
   return {
-    patientId: row.patientId,
+    patientId: person.patientId,
     firstName: fullName.split(" ")[0],
     clinicId: input.clinicId,
-    timeZone: row.timeZone,
-    treatmentId: row.treatmentId,
+    timeZone: person.timeZone,
+    treatmentId: row.id,
+    treatments: ordered.map((item) => ({
+      id: item.id,
+      name: item.name,
+      branchName: item.branchName,
+      status: item.status,
+      anchorDate: (item.actual ?? item.planned) as IsoDate,
+    })),
+    active: isActiveStatus(row.status),
     timing,
     rules: ruleRows.map(toCaptureRule),
     entries,
@@ -110,8 +157,9 @@ export async function loadPatientJournal(
   };
 }
 
-function toTiming(row: { status: "scheduled" | "performed"; planned: string; actual: string | null }): TreatmentTiming {
-  return row.status === "performed" && row.actual
+/** Day numbers keep working in the archive: a completed treatment still has its day 0. */
+function toTiming(row: { status: TreatmentStatus; planned: string; actual: string | null }): TreatmentTiming {
+  return row.status !== "scheduled" && row.actual
     ? { status: "performed", actualSurgeryDate: row.actual as IsoDate }
     : { status: "scheduled", plannedSurgeryDate: row.planned as IsoDate };
 }
@@ -154,8 +202,9 @@ export function openEntryFor(journal: PatientJournal, now: Date): JournalEntryVi
   );
 }
 
-/** Angles the patient may photograph right now (due today, or a retake of today's photo). */
+/** Angles the patient may photograph right now (due today, or a retake of today's photo). None in an archive. */
 export function anglesOpenNow(journal: PatientJournal, now: Date): PhotoAngle[] {
+  if (!journal.active) return [];
   const open = openEntryFor(journal, now);
   const preOpDone = journal.entries.filter((entry) => entry.phase === "pre_op" && entry.id !== open?.id).length;
   const due = anglesDue(journal.rules, currentPosition(now, journal.timing, journal.timeZone), preOpDone);
@@ -217,6 +266,7 @@ export async function savePatientPhoto(
 
       const fresh: PatientJournal = {
         ...journal,
+        active: isActiveStatus(treatment.status),
         timing: toTiming(treatment),
         entries: await loadEntries(tx as unknown as Database, journal.treatmentId),
       };

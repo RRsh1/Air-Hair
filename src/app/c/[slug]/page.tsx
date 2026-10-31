@@ -8,6 +8,7 @@ import { PatientFooter } from "@/components/patient/patient-footer";
 import { PatientHeader } from "@/components/patient/patient-header";
 import { photoLogo } from "@/components/patient/photo";
 import { TimelineBlock } from "@/components/patient/timeline/timeline-block";
+import { TreatmentSwitcher } from "@/components/patient/treatment-switcher";
 import { buildFilmStrip, contentFor } from "@/lib/journal/film-strip";
 import { anglesOpenNow } from "@/lib/journal/patient-journal";
 import { requireConsentedPatient } from "@/lib/legal/server";
@@ -40,59 +41,79 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
   const next = frames.find((f) => f.status === "upcoming");
   const planned = journal.timing.status === "scheduled" ? journal.timing.plannedSurgeryDate : null;
   const surgeryDate = journal.timing.status === "performed" ? journal.timing.actualSurgeryDate : journal.timing.plannedSurgeryDate;
+  const selected = journal.treatments.find((t) => t.id === journal.treatmentId)!;
 
   return (
     <>
       <PatientHeader slug={slug} clinic={clinic} />
       <main className="flex-1">
+        <TreatmentSwitcher slug={slug} treatments={journal.treatments} selectedId={journal.treatmentId} />
         <HeroBlock
           config={blocks.hero}
           data={{
             firstName: journal.firstName,
             today,
-            position: position.phase === "post_op" ? { phase: "post_op", day: position.day } : { phase: "pre_op" },
+            position: !journal.active
+              ? {
+                  phase: "archived",
+                  status: selected.status === "completed" ? "completed" : "cancelled",
+                  treatmentName: selected.name,
+                  anchorDate: selected.anchorDate,
+                }
+              : position.phase === "post_op"
+                ? { phase: "post_op", day: position.day }
+                : { phase: "pre_op" },
             plannedSurgeryDate: planned,
           }}
         />
-        <RulerBlock
-          config={blocks.ruler}
-          data={{
-            day: position.phase === "post_op" ? position.day : null,
-            totalDays: maxScheduleDay(clinic.settings.followUpMonths),
-            plannedSurgeryDate: planned,
-          }}
-        />
-        <div className="space-y-10 pt-2">
-          <CaptureBlock
-            config={blocks.capture}
+        {journal.active && (
+          <>
+            <RulerBlock
+              config={blocks.ruler}
+              data={{
+                day: position.phase === "post_op" ? position.day : null,
+                totalDays: maxScheduleDay(clinic.settings.followUpMonths),
+                plannedSurgeryDate: planned,
+              }}
+            />
+            <div className="space-y-10 pt-2">
+              <CaptureBlock
+                config={blocks.capture}
+                data={{
+                  slug,
+                  open: anglesOpenNow(journal, now),
+                  photos: todayFrame?.photos ?? {},
+                  next: next ? { day: next.day, date: next.date } : null,
+                  logo,
+                }}
+              />
+              <GuidanceBlock
+                config={blocks.guidance}
+                items={contentFor(
+                  journal.content,
+                  position.phase === "pre_op" ? { kind: "pre_op", day: null } : { kind: "post_op", day: position.day },
+                )}
+              />
+            </div>
+          </>
+        )}
+        <div className={journal.active ? "pt-12" : "pt-4"}>
+          <TimelineBlock
+            key={journal.treatmentId}
+            config={blocks.timeline}
             data={{
               slug,
-              open: anglesOpenNow(journal, now),
-              photos: todayFrame?.photos ?? {},
-              next: next ? { day: next.day, date: next.date } : null,
+              frames,
               logo,
+              today,
+              surgeryDate,
+              surgeryDone: journal.timing.status === "performed",
+              notes: Object.fromEntries(Object.entries(journal.notes).map(([date, note]) => [date, note.text])),
+              content: journal.content,
+              totalDays: maxScheduleDay(clinic.settings.followUpMonths),
+              archived: !journal.active,
             }}
           />
-          <GuidanceBlock
-            config={blocks.guidance}
-            items={contentFor(journal.content, position.phase === "pre_op" ? { kind: "pre_op", day: null } : { kind: "post_op", day: position.day })}
-          />
-        </div>
-        <div className="pt-12">
-        <TimelineBlock
-          config={blocks.timeline}
-          data={{
-            slug,
-            frames,
-            logo,
-            today,
-            surgeryDate,
-            surgeryDone: journal.timing.status === "performed",
-            notes: Object.fromEntries(Object.entries(journal.notes).map(([date, note]) => [date, note.text])),
-            content: journal.content,
-            totalDays: maxScheduleDay(clinic.settings.followUpMonths),
-          }}
-        />
         </div>
       </main>
       <PatientFooter slug={slug} />

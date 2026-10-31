@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { angleLabel, photoUrl } from "@/components/patient/format";
 import { CameraIcon, ChevronEndIcon, ChevronStartIcon, NoteIcon } from "@/components/patient/icons";
-import { NoteEditor } from "@/components/patient/note-editor";
+import { ArchivedNote, NoteEditor } from "@/components/patient/note-editor";
 import { Photo } from "@/components/patient/photo";
 import { contentFor, type Frame } from "@/lib/journal/film-strip";
 import { photoAngles } from "@/lib/timeline/capture-schedule";
@@ -43,7 +43,11 @@ function monthCells(m: Month): (IsoDate | null)[] {
 
 type DayInfo = { frame?: Frame; photographed: boolean; planned: boolean; missed: boolean; note?: string };
 
-export function DiaryView({ data }: { data: TimelineData }) {
+/** An archive has no "today": every day is a past record and none is highlighted. */
+const NO_TODAY = "9999-12-31" as IsoDate;
+
+export function DiaryView({ data: input }: { data: TimelineData }) {
+  const data = input.archived ? { ...input, today: NO_TODAY } : input;
   const byDate = useMemo(() => {
     const map = new Map<IsoDate, Frame>();
     for (const frame of data.frames) if (frame.date) map.set(frame.date, frame);
@@ -62,14 +66,20 @@ export function DiaryView({ data }: { data: TimelineData }) {
     };
   };
 
-  // The follow-up runs from the first thing on record to the end of the schedule.
-  const end = data.surgeryDate ? addDays(data.surgeryDate, data.totalDays) : data.today;
-  const starts = [data.today, ...(data.surgeryDate ? [data.surgeryDate] : []), ...byDate.keys(), ...(Object.keys(data.notes) as IsoDate[])].sort();
+  // The follow-up runs from the first thing on record to the end of the schedule. An archive
+  // ends with its last record, however long ago that was.
+  const recorded = [...(data.surgeryDate ? [data.surgeryDate] : []), ...byDate.keys(), ...(Object.keys(data.notes) as IsoDate[])].sort();
+  const end = data.archived
+    ? (recorded.at(-1) ?? data.today)
+    : data.surgeryDate
+      ? addDays(data.surgeryDate, data.totalDays)
+      : data.today;
+  const starts = data.archived && recorded.length > 0 ? recorded : [data.today, ...recorded].sort();
   const first = monthIndex(monthOf(starts[0]));
-  const last = Math.max(monthIndex(monthOf(end)), monthIndex(monthOf(data.today)));
+  const last = data.archived ? monthIndex(monthOf(end)) : Math.max(monthIndex(monthOf(end)), monthIndex(monthOf(data.today)));
 
-  const [level, setLevel] = useState<"overview" | "month">("month");
-  const [current, setCurrent] = useState(monthIndex(monthOf(data.today)));
+  const [level, setLevel] = useState<"overview" | "month">(data.archived ? "overview" : "month");
+  const [current, setCurrent] = useState(data.archived ? last : monthIndex(monthOf(data.today)));
   const [selected, setSelected] = useState<IsoDate>(data.today);
 
   const openMonth = (index: number) => {
@@ -127,17 +137,19 @@ function Overview({
         <div>
           <h3 className="p-heading text-[1.6875rem] leading-none text-tl-ink">כל ההחלמה</h3>
           <p className="mt-1.5 text-[0.875rem] text-tl-muted">
-            {monthYear.format(asDate(fromIndex(first)))} עד {monthYear.format(asDate(fromIndex(last)))}
+            {first === last
+              ? monthYear.format(asDate(fromIndex(first)))
+              : `${monthYear.format(asDate(fromIndex(first)))} עד ${monthYear.format(asDate(fromIndex(last)))}`}
           </p>
         </div>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-p border border-tl-line bg-tl-line text-center">
         <div className="bg-p-bg px-3 py-2.5">
-          <dt className="text-[0.75rem] text-tl-muted">ימי צילום עד היום</dt>
+          <dt className="text-[0.75rem] text-tl-muted">{data.archived ? "ימים שתועדו" : "ימי צילום עד היום"}</dt>
           <dd className="p-numeral mt-0.5 text-[1.3125rem] text-tl-ink">
             {done}
-            <span className="text-[0.9375rem] text-tl-muted"> מתוך {due.length}</span>
+            {!data.archived && <span className="text-[0.9375rem] text-tl-muted"> מתוך {due.length}</span>}
           </dd>
         </div>
         <div className="bg-p-bg px-3 py-2.5">
@@ -241,7 +253,7 @@ function MonthLevel({
           כל ההחלמה
         </button>
         <div className="flex items-center">
-          {(!isCurrentMonth || selected !== data.today) && (
+          {!data.archived && (!isCurrentMonth || selected !== data.today) && (
             <button type="button" onClick={onToday} className="me-1 h-10 rounded-full px-3 text-[0.9375rem] font-medium text-tl-accent">
               היום
             </button>
@@ -366,7 +378,8 @@ function DayRow({ data, date, info, expanded, onSelect }: { data: TimelineData; 
 
   const { frame } = info;
   const dayNumber = dayNumberOf(data, date);
-  const isToday = date === data.today;
+  // In an archive nothing is "today": no capture, no editing, everything shown as a record.
+  const isToday = date === data.today && !data.archived;
   const isFuture = date > data.today;
   const label =
     date === data.surgeryDate
@@ -488,7 +501,11 @@ function DayRow({ data, date, info, expanded, onSelect }: { data: TimelineData; 
               </ul>
             )}
 
-            {!isFuture && <NoteEditor key={date} slug={data.slug} date={date} initial={info.note ?? ""} />}
+            {data.archived ? (
+              info.note && <ArchivedNote text={info.note} />
+            ) : (
+              !isFuture && <NoteEditor key={date} slug={data.slug} date={date} initial={info.note ?? ""} />
+            )}
           </div>
         </div>
       )}
@@ -513,14 +530,18 @@ function Legend({ data }: { data: TimelineData }) {
         <span className="h-2 w-2 rounded-full bg-tl-accent" aria-hidden="true" />
         צולם
       </li>
-      <li className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full border border-tl-accent" aria-hidden="true" />
-        מתוכנן
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full bg-tl-ink" aria-hidden="true" />
-        היום
-      </li>
+      {!data.archived && (
+        <>
+          <li className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full border border-tl-accent" aria-hidden="true" />
+            מתוכנן
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-tl-ink" aria-hidden="true" />
+            היום
+          </li>
+        </>
+      )}
       {data.surgeryDate && (
         <li className="flex items-center gap-1.5">
           <span className="p-numeral text-tl-ink underline" aria-hidden="true">

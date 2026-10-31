@@ -1,14 +1,14 @@
 import { randomBytes } from "node:crypto";
-import { captureRules, clinics, clinicSettings, staffUsers, timelinePhases, timelineTemplates, timelineVersions } from "../../db/schema";
+import { branches, clinics, clinicSettings, staffUsers } from "../../db/schema";
 import type { Database } from "../../db/types";
 import type { Auth } from "../auth/build-auth";
 import { parseClinicSettings, type ClinicSettings } from "../clinic-settings/schema";
-import { defaultCaptureRules } from "../timeline/capture-schedule";
+import { createClinicProcedure } from "../catalog/procedures";
 import { isValidTimeZone } from "../timeline/days";
 
 /**
- * Creates a clinic ready to use: settings, a published default timeline (phases + capture
- * schedule, no content yet) and its first admin. The admin gets a Better Auth account with a
+ * Creates a clinic ready to use: settings, its main branch, a published default timeline for a
+ * hair transplant (phases + capture schedule, no content yet) and its first admin. The admin gets a Better Auth account with a
  * random password they never see; they set their own through the password link.
  */
 
@@ -22,7 +22,7 @@ export type ProvisionInput = {
   settings?: Partial<ClinicSettings>;
 };
 
-export type ProvisionResult = { clinicId: string; staffId: string; authUserId: string; templateId: string };
+export type ProvisionResult = { clinicId: string; branchId: string; staffId: string; authUserId: string; templateId: string };
 
 const SLUG = /^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$/;
 
@@ -57,43 +57,25 @@ export async function provisionClinic(db: Database, auth: Auth, input: Provision
   return db.transaction(async (tx) => {
     const [clinic] = await tx.insert(clinics).values({ name: input.clinicName, slug, timeZone }).returning({ id: clinics.id });
     await tx.insert(clinicSettings).values({ clinicId: clinic.id, settings });
+    const [branch] = await tx
+      .insert(branches)
+      .values({ clinicId: clinic.id, name: "סניף ראשי", isMain: true })
+      .returning({ id: branches.id });
 
     const [staff] = await tx
       .insert(staffUsers)
       .values({ clinicId: clinic.id, role: "admin", email, fullName: input.adminName, authUserId: authUser.id })
       .returning({ id: staffUsers.id });
 
-    const [template] = await tx
-      .insert(timelineTemplates)
-      .values({ clinicId: clinic.id, name: "השתלת שיער" })
-      .returning({ id: timelineTemplates.id });
+    const { templateId } = await createClinicProcedure(tx as unknown as Database, {
+      clinicId: clinic.id,
+      name: "השתלת שיער",
+      libraryKey: "hair.scalp",
+      followUpMonths: settings.followUpMonths,
+      staffId: staff.id,
+    });
 
-    const [version] = await tx
-      .insert(timelineVersions)
-      .values({ templateId: template.id, version: 1, status: "published", publishedAt: new Date(), publishedBy: staff.id })
-      .returning({ id: timelineVersions.id });
-
-    await tx.insert(timelinePhases).values([
-      { versionId: version.id, phase: "pre_op", name: "לפני הניתוח", sortOrder: 0 },
-      { versionId: version.id, phase: "post_op", fromDay: 0, toDay: settings.followUpMonths * 30, name: "החלמה", sortOrder: 1 },
-    ]);
-
-    await tx.insert(captureRules).values(
-      defaultCaptureRules(settings.followUpMonths).map((rule) =>
-        rule.phase === "pre_op"
-          ? { versionId: version.id, phase: rule.phase, maxCount: rule.maxCount, angles: [...rule.angles] }
-          : {
-              versionId: version.id,
-              phase: rule.phase,
-              fromDay: rule.fromDay,
-              toDay: rule.toDay,
-              everyDays: rule.everyDays,
-              angles: [...rule.angles],
-            },
-      ),
-    );
-
-    return { clinicId: clinic.id, staffId: staff.id, authUserId: authUser.id, templateId: template.id };
+    return { clinicId: clinic.id, branchId: branch.id, staffId: staff.id, authUserId: authUser.id, templateId };
   });
 }
 

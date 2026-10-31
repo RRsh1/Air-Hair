@@ -34,6 +34,12 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
    before the DB row; FK cascades alone leave files behind.
 7. **Timeline content is structured JSON, never raw HTML.**
 8. Writes that view or change patient data append to `audit_log` (no identifying data in metadata).
+9. **One person, many treatments.** A patient account belongs to the clinic (organization) and keeps
+   every treatment over the years; each treatment has its own procedure (timeline template), branch,
+   protocol version, day 0 and status (`scheduled → performed → completed`, or `cancelled`). A returning
+   patient gets a new treatment via `addTreatment` (src/lib/treatments/lifecycle.ts), never a new account.
+   Completed/cancelled treatments are a read-only archive: no photos, no notes, nothing deleted. The DB
+   allows one active treatment per patient and procedure (partial unique index).
 
 ## Commands
 - `npm test` — unit tests (crypto, validation, authz, settings, timeline)
@@ -53,6 +59,16 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 - Auth tables: src/db/auth-schema.ts, regenerated with `npm run auth:schema` (then re-apply the
   auth_ prefix and withTimezone edits described in its header).
 - New clinic + first admin: `npm run clinic:create -- --name "..." --slug demo --admin-email ... --admin-name "..."`.
+
+## Organization, branches, catalog
+- Branches (src/lib/branches): every clinic has exactly one main branch (created by `provisionClinic`,
+  the default for new treatments; it will run org-wide reports). `staff_users.all_branches` + `staff_branches`
+  record branch assignment; the access policy does not enforce it yet (that change goes through authz).
+- Catalog (src/lib/catalog): `procedure_library` is platform-wide (hair.scalp, hair.beard, hair.mustache,
+  hair.eyebrows; dental/wound planned). A clinic adopts one with `adoptLibraryProcedure`, which creates its
+  own timeline template (library_key) with a published v1; the clinic then edits its copy.
+- Dev: `npm run treatment:add -- --clinic demo --id 123456782 --procedure hair.beard --surgery 2026-11-15 [--performed] [--complete-previous]`.
+- Platform spec (data model, CRM, analytics, landing builder, operator console): the Claude Docs spec, sections after "מודל הנתונים של הפלטפורמה".
 
 ## Patient app (/c/<clinic slug>)
 - Patients sign in with national ID + mobile + SMS code (src/lib/patient-auth). Never reveal whether
@@ -88,6 +104,11 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   grid with the month's days listed below it; the selected day opens in place (photos, guidance
   titles, note) and leads to the day page, which steps to the previous/next day. On the home screen
   today's capture and guidance come first, so the diary's today row shows only the note.
+- Several treatments: `loadPatientJournal` loads them all (active first, newest first) and works on the
+  selected one (cookie `ha_treatment`, set by `selectTreatmentAction`, honoured only for the patient's own
+  treatment ids) or the default. `TreatmentSwitcher` shows on the home screen when there are two or more.
+  An archived treatment: hero says it ended, no ruler/capture/guidance, the diary opens on the overview,
+  shows only photographed days, has no "today" and shows notes read-only.
 - Day notes (src/lib/journal/notes.ts): the patient's own note per local date, today or earlier, field-
   encrypted (`journal_notes.body`), audited without text, empty text deletes. Loaded with the journal
   (`journal.notes`); edited with `NoteEditor` in the diary and on the day page.
@@ -108,6 +129,8 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 ## Status
 Done: foundations, staff auth (TOTP), patient app v1 (login, film-strip timeline, capture with
 alignment ghost, day view with comparison), patient-side security review fixes, consent signing + privacy policy page, patient design v2 (block themes, five timeline views,
-logo on every photo + download), diary (overview, month + day list, day page) with day notes.
-Next: clinic dashboard (patients incl. signed consents, document upload, timeline editor, branding editor
-with live preview), RLS on clinic_id, SMS + email providers, R2 storage.
+logo on every photo + download), diary (overview, month + day list, day page) with day notes,
+platform foundation (branches, procedure catalog, treatment lifecycle, returning patients, treatment switcher).
+Next: clinic dashboard (staff users + branch assignment, person card, treatments, documents, settings,
+branding editor with live preview and per-branch override), then leads/CRM, reports, landing page builder,
+operator console. Also: RLS on clinic_id, SMS + email providers, R2 storage, per-procedure capture angles.

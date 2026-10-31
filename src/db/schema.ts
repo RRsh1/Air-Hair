@@ -3,6 +3,7 @@ import { staffRoles } from "../lib/authz/capabilities";
 import { user as authUser } from "./auth-schema";
 import {
   bigserial,
+  boolean,
   check,
   foreignKey,
   date,
@@ -43,7 +44,13 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 
 export const timelinePhase = pgEnum("timeline_phase", ["pre_op", "post_op"]);
 export const photoAngle = pgEnum("photo_angle", ["front", "top", "back"]);
-export const treatmentStatus = pgEnum("treatment_status", ["scheduled", "performed"]);
+/**
+ * scheduled → performed → completed, or cancelled. Only scheduled and performed are active: a completed
+ * or cancelled treatment is a read-only archive (no new photos or notes), kept in full.
+ */
+export const treatmentStatus = pgEnum("treatment_status", ["scheduled", "performed", "completed", "cancelled"]);
+/** Business vertical of a procedure. Hair is live; the others are planned. */
+export const vertical = pgEnum("vertical", ["hair", "dental", "wound"]);
 export const publishStatus = pgEnum("publish_status", ["draft", "published", "superseded"]);
 export const contentType = pgEnum("content_type", ["tip", "recommendation", "instruction"]);
 export const assetKind = pgEnum("asset_kind", ["logo", "background", "document", "signature"]);
@@ -118,6 +125,49 @@ export const clinicAssets = pgTable(
   (t) => [index("clinic_assets_clinic_kind_idx").on(t.clinicId, t.kind)],
 );
 
+// ─── Branches ─────────────────────────────────────────────────────────────────
+
+/**
+ * A clinic (the organization) has one or more branches; exactly one is the main branch, which runs
+ * organization-wide reports. Patients belong to the organization; each treatment belongs to a branch.
+ */
+export const branches = pgTable(
+  "branches",
+  {
+    id: id(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    isMain: boolean("is_main").notNull().default(false),
+    createdAt: createdAt(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("branches_id_clinic_uq").on(t.id, t.clinicId),
+    uniqueIndex("branches_one_main_uq").on(t.clinicId).where(sql`${t.isMain}`),
+    check("branches_main_active_ck", sql`not (${t.isMain} and ${t.archivedAt} is not null)`),
+  ],
+);
+
+// ─── Procedure catalog ────────────────────────────────────────────────────────
+
+/**
+ * Platform-wide list of procedures (no clinic_id). A clinic's own copy is a timeline template
+ * (timeline_templates.library_key), which carries the clinic's versions of the protocol.
+ */
+export const procedureLibrary = pgTable(
+  "procedure_library",
+  {
+    /** Stable key, "<vertical>.<area>", e.g. hair.beard. */
+    key: text("key").primaryKey(),
+    vertical: vertical("vertical").notNull(),
+    nameHe: text("name_he").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [check("procedure_library_key_ck", sql`${t.key} ~ '^[a-z]+\\.[a-z_]+$'`)],
+);
+
 // ─── Staff ────────────────────────────────────────────────────────────────────
 
 export const staffUsers = pgTable(
@@ -135,12 +185,39 @@ export const staffUsers = pgTable(
     email: text("email").notNull(),
     fullName: text("full_name").notNull(),
     totpSecretEnc: text("totp_secret_enc"),
+    /** True: works in every branch. False: only the branches listed in staff_branches. */
+    allBranches: boolean("all_branches").notNull().default(true),
     createdAt: createdAt(),
     disabledAt: timestamp("disabled_at", { withTimezone: true }),
   },
   (t) => [
     uniqueIndex("staff_users_id_clinic_uq").on(t.id, t.clinicId),
     uniqueIndex("staff_users_clinic_email_uq").on(t.clinicId, sql`lower(${t.email})`),
+  ],
+);
+
+/** Branch assignments of staff whose all_branches is false. Not enforced by the access policy yet. */
+export const staffBranches = pgTable(
+  "staff_branches",
+  {
+    clinicId: uuid("clinic_id").notNull(),
+    staffId: uuid("staff_id").notNull(),
+    branchId: uuid("branch_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.staffId, t.branchId] }),
+    index("staff_branches_branch_idx").on(t.branchId),
+    foreignKey({
+      name: "staff_branches_staff_fk",
+      columns: [t.staffId, t.clinicId],
+      foreignColumns: [staffUsers.id, staffUsers.clinicId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "staff_branches_branch_fk",
+      columns: [t.branchId, t.clinicId],
+      foreignColumns: [branches.id, branches.clinicId],
+    }).onDelete("cascade"),
   ],
 );
 
@@ -207,6 +284,8 @@ export const timelineTemplates = pgTable(
       .references(() => clinics.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     technique: text("technique"),
+    /** The library procedure this is the clinic's copy of; null for a procedure of the clinic's own. */
+    libraryKey: text("library_key").references(() => procedureLibrary.key),
     createdAt: createdAt(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
@@ -309,6 +388,8 @@ export const treatments = pgTable(
       .notNull()
       .references(() => clinics.id, { onDelete: "cascade" }),
     patientId: uuid("patient_id").notNull(),
+    /** Where the treatment takes place. A patient may have treatments in several branches. */
+    branchId: uuid("branch_id").notNull(),
     status: treatmentStatus("status").notNull().default("scheduled"),
     /** Editable at any time while scheduled (postponements). */
     plannedSurgeryDate: date("planned_surgery_date").notNull(),
@@ -316,6 +397,8 @@ export const treatments = pgTable(
     actualSurgeryDate: date("actual_surgery_date"),
     performedMarkedAt: timestamp("performed_marked_at", { withTimezone: true }),
     performedMarkedBy: uuid("performed_marked_by").references(() => staffUsers.id, { onDelete: "set null" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     templateId: uuid("template_id").notNull(),
     /** The template version this treatment follows; see clinic setting structuralChangesApplyTo. */
     versionId: uuid("version_id").notNull(),
@@ -329,6 +412,11 @@ export const treatments = pgTable(
       foreignColumns: [patients.id, patients.clinicId],
     }).onDelete("cascade"),
     foreignKey({
+      name: "treatments_branch_fk",
+      columns: [t.branchId, t.clinicId],
+      foreignColumns: [branches.id, branches.clinicId],
+    }),
+    foreignKey({
       name: "treatments_template_fk",
       columns: [t.templateId, t.clinicId],
       foreignColumns: [timelineTemplates.id, timelineTemplates.clinicId],
@@ -339,10 +427,17 @@ export const treatments = pgTable(
       foreignColumns: [timelineVersions.id, timelineVersions.templateId],
     }),
     index("treatments_clinic_status_idx").on(t.clinicId, t.status),
+    index("treatments_branch_status_idx").on(t.branchId, t.status),
+    /** A returning patient opens a new treatment; at most one active per procedure at a time. */
+    uniqueIndex("treatments_one_active_per_procedure_uq")
+      .on(t.patientId, t.templateId)
+      .where(sql`${t.status} in ('scheduled', 'performed')`),
     check(
-      "treatments_performed_ck",
-      sql`(${t.status} = 'scheduled' and ${t.actualSurgeryDate} is null)
-       or (${t.status} = 'performed' and ${t.actualSurgeryDate} is not null)`,
+      "treatments_status_ck",
+      sql`(${t.status} = 'scheduled' and ${t.actualSurgeryDate} is null and ${t.completedAt} is null and ${t.cancelledAt} is null)
+       or (${t.status} = 'performed' and ${t.actualSurgeryDate} is not null and ${t.completedAt} is null and ${t.cancelledAt} is null)
+       or (${t.status} = 'completed' and ${t.actualSurgeryDate} is not null and ${t.completedAt} is not null and ${t.cancelledAt} is null)
+       or (${t.status} = 'cancelled' and ${t.cancelledAt} is not null and ${t.completedAt} is null)`,
     ),
   ],
 );

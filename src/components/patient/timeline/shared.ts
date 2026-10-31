@@ -16,6 +16,8 @@ export type TimelineData = {
   content: ContentItem[];
   /** Length of the follow-up in days after surgery. */
   totalDays: number;
+  /** A completed or cancelled treatment: read-only, opens on the overview of what was documented. */
+  archived: boolean;
 };
 
 /** Post-op day number of a calendar date, when the surgery was performed. */

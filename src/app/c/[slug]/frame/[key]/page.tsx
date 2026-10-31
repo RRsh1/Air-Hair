@@ -5,7 +5,7 @@ import { GuidanceBlock } from "@/components/patient/blocks/guidance";
 import Link from "next/link";
 import { ChevronEndIcon, ChevronStartIcon } from "@/components/patient/icons";
 import { formatWeekdayDate } from "@/components/patient/timeline/shared";
-import { NoteEditor } from "@/components/patient/note-editor";
+import { ArchivedNote, NoteEditor } from "@/components/patient/note-editor";
 import { PatientHeader } from "@/components/patient/patient-header";
 import { photoLogo } from "@/components/patient/photo";
 import { buildFilmStrip, contentFor } from "@/lib/journal/film-strip";
@@ -70,9 +70,14 @@ async function FrameBody({ params }: Pick<PageProps<"/c/[slug]/frame/[key]">, "p
           )}
         </div>
 
-        {frame.date && (
+        {frame.date && context.journal.active && (
           <div className="mt-8 px-5">
             <NoteEditor slug={slug} date={frame.date} initial={context.journal.notes[frame.date]?.text ?? ""} />
+          </div>
+        )}
+        {frame.date && !context.journal.active && context.journal.notes[frame.date] && (
+          <div className="mt-8 px-5">
+            <ArchivedNote text={context.journal.notes[frame.date].text} />
           </div>
         )}
 

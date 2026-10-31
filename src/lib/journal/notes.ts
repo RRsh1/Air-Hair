@@ -8,8 +8,9 @@ import type { PatientJournal } from "./patient-journal";
 
 /**
  * The patient's notes, one per day of the recovery. Notes can be written for today and for any
- * earlier day of the treatment, never for the future. The text is encrypted like other patient
- * data; saving an empty note deletes it.
+ * earlier day of the treatment, never for the future, and only while the treatment is active (a
+ * completed treatment is a read-only archive). The text is encrypted like other patient data;
+ * saving an empty note deletes it.
  */
 
 export const MAX_NOTE_LENGTH = 2000;
@@ -37,7 +38,8 @@ export async function loadDayNotes(
 export type SaveNoteResult =
   | { status: "saved"; text: string }
   | { status: "deleted" }
-  | { status: "invalid"; reason: "date" | "too_long" };
+  | { status: "invalid"; reason: "date" | "too_long" }
+  | { status: "archived" };
 
 export async function saveDayNote(
   db: Database,
@@ -45,6 +47,7 @@ export async function saveDayNote(
 ): Promise<SaveNoteResult> {
   const now = input.now ?? new Date();
   const { journal } = input;
+  if (!journal.active) return { status: "archived" };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || Number.isNaN(Date.parse(`${input.date}T00:00:00Z`))) {
     return { status: "invalid", reason: "date" };
   }

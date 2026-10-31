@@ -17,7 +17,8 @@
     "clinic:create": "tsx scripts/create-clinic.ts",
     "auth:schema": "npx auth@latest generate --config scripts/auth-cli.config.ts --output src/db/auth-schema.ts -y",
     "db:migrate:local": "tsx scripts/migrate-local.ts",
-    "patient:create": "tsx --conditions=react-server scripts/create-patient.ts"
+    "patient:create": "tsx --conditions=react-server scripts/create-patient.ts",
+    "treatment:add": "tsx --conditions=react-server scripts/add-treatment.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",

@@ -17,6 +17,7 @@ export async function saveNoteAction(slug: string, date: string, _prev: NoteStat
   if (consent.required && !consent.signedAt) return { status: "error", text, message: "צריך לחתום על מסמך ההסכמה לפני כתיבת הערות." };
 
   const result = await saveDayNote(getDb(), { journal: context.journal, date, text, ip: await requestIp() });
+  if (result.status === "archived") return { status: "error", text, message: "הטיפול הזה הסתיים, ואפשר רק לצפות בו." };
   if (result.status === "invalid") {
     return {
       status: "error",

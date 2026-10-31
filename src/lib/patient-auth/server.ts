@@ -5,6 +5,7 @@ import { cache } from "react";
 import { getDb } from "@/db/client";
 import { loadClinicBySlug, type ClinicRecord } from "@/lib/clinic/load";
 import { loadPatientJournal, type PatientJournal } from "@/lib/journal/patient-journal";
+import { treatmentCookieName } from "@/lib/journal/selection";
 import { clientIpFromHeaders } from "@/lib/net/client-ip";
 import { loadPatientSession, patientCookieName } from "./session";
 
@@ -21,11 +22,16 @@ export const getClinic = cache(async (slug: string) => loadClinicBySlug(getDb(),
 export const getPatientContext = cache(async (slug: string): Promise<PatientContext | null> => {
   const clinic = await getClinic(slug);
   if (!clinic) return null;
-  const token = (await cookies()).get(patientCookieName)?.value;
+  const jar = await cookies();
+  const token = jar.get(patientCookieName)?.value;
   if (!token) return null;
   const session = await loadPatientSession(getDb(), { token, clinicId: clinic.id });
   if (!session) return null;
-  const journal = await loadPatientJournal(getDb(), { clinicId: clinic.id, patientId: session.patientId });
+  const journal = await loadPatientJournal(getDb(), {
+    clinicId: clinic.id,
+    patientId: session.patientId,
+    treatmentId: jar.get(treatmentCookieName)?.value ?? null,
+  });
   return journal ? { clinic, journal, sessionId: session.sessionId } : null;
 });
 

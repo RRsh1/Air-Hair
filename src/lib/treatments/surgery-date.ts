@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { auditLog, treatments } from "../../db/schema";
 import type { Database } from "../../db/types";
 import type { IsoDate } from "../timeline/days";
@@ -37,7 +37,10 @@ export async function reschedulePlannedSurgery(
   return true;
 }
 
-/** Marks the surgery performed, or corrects the actual date of a performed surgery. */
+/**
+ * Marks the surgery performed, or corrects the actual date of a performed surgery.
+ * Completed and cancelled treatments are archives and can't change.
+ */
 export async function setActualSurgeryDate(
   db: Database,
   input: { clinicId: string; treatmentId: string; actualDate: string; staffId: string | null; now?: Date },
@@ -51,7 +54,13 @@ export async function setActualSurgeryDate(
       performedMarkedAt: input.now ?? new Date(),
       performedMarkedBy: input.staffId,
     })
-    .where(and(eq(treatments.id, input.treatmentId), eq(treatments.clinicId, input.clinicId)))
+    .where(
+      and(
+        eq(treatments.id, input.treatmentId),
+        eq(treatments.clinicId, input.clinicId),
+        inArray(treatments.status, ["scheduled", "performed"]),
+      ),
+    )
     .returning({ patientId: treatments.patientId });
   if (updated.length === 0) return false;
   await db.insert(auditLog).values({

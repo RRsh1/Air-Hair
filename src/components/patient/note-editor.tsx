@@ -124,3 +124,16 @@ export function NoteEditor({ slug, date, initial }: { slug: string; date: string
     </form>
   );
 }
+
+/** A note of a completed treatment: shown as a record, not editable. */
+export function ArchivedNote({ text }: { text: string }) {
+  return (
+    <div className="rounded-p border border-tl-line bg-p-surface px-4 py-3.5">
+      <p className="flex items-center gap-1.5 text-[0.8125rem] text-tl-muted">
+        <NoteIcon className="h-4 w-4" />
+        ההערה שלי
+      </p>
+      <p className="mt-1.5 whitespace-pre-line text-[1rem] leading-relaxed text-tl-ink">{text}</p>
+    </div>
+  );
+}

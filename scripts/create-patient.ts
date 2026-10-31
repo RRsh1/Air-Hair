@@ -11,7 +11,6 @@ import { parseArgs } from "node:util";
 import { openDatabase } from "../src/db/open";
 import { loadClinicBySlug } from "../src/lib/clinic/load";
 import { createPatient } from "../src/lib/patients/create-patient";
-import type { IsoDate } from "../src/lib/timeline/days";
 import { setActualSurgeryDate } from "../src/lib/treatments/surgery-date";
 
 config({ path: ".env.local" });
@@ -32,6 +31,7 @@ const messages = {
   nationalId: "Invalid Israeli ID number (check digit)",
   phone: "Invalid Israeli mobile number",
   plannedSurgeryDate: "Surgery date must be YYYY-MM-DD",
+  branch: "Unknown branch",
 } as const;
 
 async function main() {
@@ -52,7 +52,7 @@ async function main() {
       fullName: name,
       nationalId: id,
       phone,
-      plannedSurgeryDate: surgery as IsoDate,
+      plannedSurgeryDate: surgery,
     });
     if (result.status === "invalid") throw new Error(messages[result.field]);
     if (result.status === "duplicate") throw new Error("A patient with this ID number already exists in this clinic");

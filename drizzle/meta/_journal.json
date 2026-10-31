@@ -64,6 +64,13 @@
       "when": 1793362555860,
       "tag": "0008_journal_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793478547633,
+      "tag": "0009_platform_foundation",
+      "breakpoints": true
     }
   ]
 }

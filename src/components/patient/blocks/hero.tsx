@@ -6,9 +6,15 @@ import type { IsoDate } from "@/lib/timeline/days";
 export type HeroData = {
   firstName: string;
   today: IsoDate;
-  position: { phase: "pre_op" } | { phase: "post_op"; day: number };
+  position:
+    | { phase: "pre_op" }
+    | { phase: "post_op"; day: number }
+    /** A completed or cancelled treatment the patient is looking back at. */
+    | { phase: "archived"; status: "completed" | "cancelled"; treatmentName: string; anchorDate: IsoDate };
   plannedSurgeryDate: IsoDate | null;
 };
+
+const fullDate = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 /** Greeting and where the patient is in the recovery. Variants: numeral, compact, banner. */
 export function HeroBlock({ config, data }: { config: ThemeBlocks["hero"]; data: HeroData }) {
@@ -16,7 +22,22 @@ export function HeroBlock({ config, data }: { config: ThemeBlocks["hero"]; data:
   const banner = config.variant === "banner";
 
   const body =
-    position.phase === "post_op" ? (
+    position.phase === "archived" ? (
+      <>
+        <p className="text-[1.0625rem] text-hr-muted">שלום {data.firstName}</p>
+        <h1 className={`p-title mt-1 leading-tight text-hr-ink ${config.variant === "compact" ? "text-[1.6875rem]" : "text-[2.125rem]"}`}>
+          {position.treatmentName}
+        </h1>
+        <p className="mt-2 text-[1rem] text-hr-ink">
+          {position.status === "completed"
+            ? `הטיפול הסתיים · יום הניתוח ${fullDate.format(new Date(`${position.anchorDate}T00:00:00Z`))}`
+            : "הטיפול בוטל"}
+        </p>
+        <p className="mt-1 max-w-[34ch] text-[0.9375rem] leading-relaxed text-hr-muted">
+          כל התיעוד נשמר כאן לצפייה. אפשר לעבור בין הימים ולהשוות תמונות.
+        </p>
+      </>
+    ) : position.phase === "post_op" ? (
       config.variant === "compact" ? (
         <>
           <p className="text-[1.0625rem] text-hr-muted">שלום {data.firstName}</p>

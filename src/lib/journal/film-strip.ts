@@ -5,6 +5,7 @@ import type { ContentItem, JournalEntryView, PatientJournal } from "./patient-jo
 /**
  * Turns a patient's journal into the frames of the film strip: one frame before surgery,
  * then one per capture day, plus any extra day the patient photographed off-schedule.
+ * A completed or cancelled treatment is an archive: only the days that were photographed.
  */
 
 export type FrameStatus = "done" | "partial" | "today" | "missed" | "upcoming" | "locked";
@@ -79,7 +80,10 @@ export function buildFilmStrip(journal: PatientJournal, now: Date): Frame[] {
       photos,
     });
   }
-  return frames;
+  if (journal.active) return frames;
+  return frames
+    .filter((frame) => photoAngles.some((angle) => frame.photos[angle]))
+    .map((frame) => ({ ...frame, status: statusFor(frame.photos, false, true, false) }));
 }
 
 /** Content items that apply on a given position of the timeline. */
