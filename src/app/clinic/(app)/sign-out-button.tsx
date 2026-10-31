@@ -13,7 +13,7 @@ export function SignOutButton() {
         router.replace("/clinic/login");
         router.refresh();
       }}
-      className="rounded-md border border-line px-3 py-1.5 font-medium hover:border-petrol hover:text-petrol"
+      className="rounded-md border border-line px-3 py-1.5 text-[0.9375rem] font-medium hover:border-petrol hover:text-petrol"
     >
       יציאה
     </button>

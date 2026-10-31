@@ -12,6 +12,19 @@ import { defaultCaptureRules } from "../timeline/capture-schedule";
 
 export type LibraryProcedure = { key: string; vertical: "hair" | "dental" | "wound"; nameHe: string };
 
+export type ClinicProcedure = { templateId: string; name: string; libraryKey: string | null };
+
+/** The clinic's own procedures (active timeline templates with a published version). */
+export async function listClinicProcedures(db: Database, clinicId: string): Promise<ClinicProcedure[]> {
+  return db
+    .selectDistinct({ templateId: timelineTemplates.id, name: timelineTemplates.name, libraryKey: timelineTemplates.libraryKey, createdAt: timelineTemplates.createdAt })
+    .from(timelineTemplates)
+    .innerJoin(timelineVersions, and(eq(timelineVersions.templateId, timelineTemplates.id), eq(timelineVersions.status, "published")))
+    .where(and(eq(timelineTemplates.clinicId, clinicId), isNull(timelineTemplates.archivedAt)))
+    .orderBy(asc(timelineTemplates.createdAt))
+    .then((rows) => rows.map(({ templateId, name, libraryKey }) => ({ templateId, name, libraryKey })));
+}
+
 export async function listLibrary(db: Database): Promise<LibraryProcedure[]> {
   return db
     .select({ key: procedureLibrary.key, vertical: procedureLibrary.vertical, nameHe: procedureLibrary.nameHe })

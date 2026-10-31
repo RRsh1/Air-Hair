@@ -60,6 +60,20 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   auth_ prefix and withTimezone edits described in its header).
 - New clinic + first admin: `npm run clinic:create -- --name "..." --slug demo --admin-email ... --admin-name "..."`.
 
+## Clinic dashboard (/clinic, route group (app))
+- Shell: src/app/clinic/(app)/layout.tsx (rail with clinic name and sections; the nav that reads the URL
+  streams inside Suspense). /clinic redirects to /clinic/patients.
+- Staff-side data goes through src/lib/clinic-patients/patients.ts: `listPatients` (patientScope → WHERE,
+  search by name in memory or exact ID/mobile via blind index, status and branch filters), `openPatient`
+  (canAccessPatient, decrypts, loads treatments with photos by day and notes, audits `patient.view`;
+  unknown and forbidden both return not_found), `staffMayAccess`, `photoKeyForStaff`. Screens get the
+  actor with `getStaffContext()` (src/lib/clinic-patients/server.ts).
+- Staff photos are served by /clinic/photos/[photoId] (policy-checked, no-store, sandbox CSP).
+- Actions (src/app/clinic/(app)/patients/actions.ts) check capabilities: create → patient.create;
+  add treatment / reschedule → patient.edit; performed / complete / cancel → treatment.mark_performed.
+  A new-patient form with an existing ID number offers that patient's card (returning patient).
+- Local dashboard check: REQUIRE_STAFF_2FA=false in .env.local (dev only) and a known admin password.
+
 ## Organization, branches, catalog
 - Branches (src/lib/branches): every clinic has exactly one main branch (created by `provisionClinic`,
   the default for new treatments; it will run org-wide reports). `staff_users.all_branches` + `staff_branches`
@@ -130,7 +144,9 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 Done: foundations, staff auth (TOTP), patient app v1 (login, film-strip timeline, capture with
 alignment ghost, day view with comparison), patient-side security review fixes, consent signing + privacy policy page, patient design v2 (block themes, five timeline views,
 logo on every photo + download), diary (overview, month + day list, day page) with day notes,
-platform foundation (branches, procedure catalog, treatment lifecycle, returning patients, treatment switcher).
-Next: clinic dashboard (staff users + branch assignment, person card, treatments, documents, settings,
-branding editor with live preview and per-branch override), then leads/CRM, reports, landing page builder,
+platform foundation (branches, procedure catalog, treatment lifecycle, returning patients, treatment switcher),
+dashboard slice 1 (shell, patient register, new patient, patient card with treatments, contact sheet, notes,
+signed documents, lifecycle actions, returning patient).
+Next: Puck RTL spike for the landing builder; dashboard: documents, settings, branding editor with live preview
+and per-branch override, branches screen; staff users + branch assignment (touches auth/authz), then leads/CRM, reports, landing page builder,
 operator console. Also: RLS on clinic_id, SMS + email providers, R2 storage, per-procedure capture angles.
