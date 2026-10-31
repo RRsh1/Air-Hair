@@ -17,4 +17,9 @@ export const angleHint: Record<PhotoAngle, string> = {
   back: "העורף והחלק האחורי של הראש.",
 };
 
-export const photoUrl = (slug: string, photoId: string) => `/c/${slug}/photos/${photoId}`;
+/** Slug of the branding editor's preview (never a real clinic slug: underscores aren't allowed). */
+export const PREVIEW_SLUG = "__preview";
+
+/** A patient photo; in the branding preview, a bundled sample image instead. */
+export const photoUrl = (slug: string, photoId: string) =>
+  slug === PREVIEW_SLUG ? `/branding-preview/${photoId}.jpg` : `/c/${slug}/photos/${photoId}`;

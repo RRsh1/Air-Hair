@@ -82,6 +82,12 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   consent among patients in treatment, publish as text or PDF through the route handler
   /clinic/documents/publish (multipart form post, same-origin, size-checked; not a server action because
   of the body limit). Staff open any version's PDF at /clinic/documents/[documentId].
+- Branding editor (/clinic/branding, branding.manage): presets, palette, typography, per-block variants and
+  role colors, logo upload (route handler /clinic/branding/logo) and logo-on-photo settings. Every edit goes
+  through parsePatientTheme; contrast issues are listed live and block publishing (`publishThemeAction`,
+  re-checked on the server). The live preview renders the real patient blocks with sample data
+  (`sample.ts`, photos from public/branding-preview via PREVIEW_SLUG in photoUrl) in a same-origin iframe
+  at phone width, with the dashboard's stylesheets copied in; clicking a block selects it.
 - Local dashboard check: REQUIRE_STAFF_2FA=false in .env.local (dev only) and a known admin password.
 
 ## Organization, branches, catalog
@@ -139,8 +145,7 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   logo (hidden on tiny thumbnails via container queries). Downloads burn the logo in client-side
   (`downloadWithLogo`); stored files stay clean.
 - Themes are refused when text fails WCAG contrast in any block (`themeIssues`). Presets: src/lib/theme/presets.ts.
-  Until the dashboard editor exists, publish with
-  `npx tsx --conditions=react-server scripts/publish-branding.ts --clinic demo --preset granite --logo scripts/samples/logo-sample.png`.
+  Clinics edit it in the dashboard (/clinic/branding); scripts/publish-branding.ts remains for setup.
 - If patient styles look stale in `next dev`, stop it and delete `.next` (Turbopack's Tailwind cache).
 - SMS: src/lib/notifications/sms.ts prints to the console in development; in production there is no
   provider yet, so patient login is closed for everyone until one is added.
@@ -156,6 +161,6 @@ logo on every photo + download), diary (overview, month + day list, day page) wi
 platform foundation (branches, procedure catalog, treatment lifecycle, returning patients, treatment switcher),
 dashboard slice 1 (shell, patient register, new patient, patient card with treatments, contact sheet, notes,
 signed documents, lifecycle actions, returning patient), Puck RTL spike (branch spike/puck, go),
-dashboard slice 2 (capability-based nav, settings, branches, legal documents with coverage).
-Next: dashboard branding editor with live preview and per-branch override; staff users + branch assignment (touches auth/authz), then leads/CRM, reports, landing page builder,
+dashboard slice 2 (capability-based nav, settings, branches, legal documents with coverage), branding editor.
+Next: per-branch branding override; staff users + branch assignment (touches auth/authz), then leads/CRM, reports, landing page builder,
 operator console. Also: RLS on clinic_id, SMS + email providers, R2 storage, per-procedure capture angles.

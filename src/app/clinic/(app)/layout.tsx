@@ -46,6 +46,7 @@ async function Nav() {
   const sections = [
     ...baseSections,
     ...(canStaff(actor, "legal.manage", staff.settings) ? [{ href: "/clinic/documents", label: "מסמכים" }] : []),
+    ...(canStaff(actor, "branding.manage", staff.settings) ? [{ href: "/clinic/branding", label: "מיתוג" }] : []),
     ...(canStaff(actor, "settings.manage", staff.settings) ? [{ href: "/clinic/settings", label: "הגדרות" }] : []),
   ];
   return <CurrentNavLinks sections={sections} />;
