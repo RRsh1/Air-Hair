@@ -4,6 +4,7 @@ import { CaptureBlock } from "@/components/patient/blocks/capture";
 import { GuidanceBlock } from "@/components/patient/blocks/guidance";
 import { HeroBlock } from "@/components/patient/blocks/hero";
 import { RulerBlock } from "@/components/patient/blocks/ruler";
+import { InstallApp } from "@/components/patient/install-app";
 import { PatientFooter } from "@/components/patient/patient-footer";
 import { PatientHeader } from "@/components/patient/patient-header";
 import { photoLogo } from "@/components/patient/photo";
@@ -115,6 +116,7 @@ async function Home({ params }: Pick<PageProps<"/c/[slug]">, "params">) {
             }}
           />
         </div>
+        <InstallApp slug={slug} clinicName={clinic.name} />
       </main>
       <PatientFooter slug={slug} />
     </>

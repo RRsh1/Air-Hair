@@ -47,6 +47,7 @@ async function Nav() {
     ...baseSections,
     ...(canStaff(actor, "legal.manage", staff.settings) ? [{ href: "/clinic/documents", label: "מסמכים" }] : []),
     ...(canStaff(actor, "branding.manage", staff.settings) ? [{ href: "/clinic/branding", label: "מיתוג" }] : []),
+    ...(canStaff(actor, "staff.manage", staff.settings) ? [{ href: "/clinic/staff", label: "צוות" }] : []),
     ...(canStaff(actor, "settings.manage", staff.settings) ? [{ href: "/clinic/settings", label: "הגדרות" }] : []),
   ];
   return <CurrentNavLinks sections={sections} />;

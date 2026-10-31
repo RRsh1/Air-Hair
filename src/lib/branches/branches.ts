@@ -94,3 +94,8 @@ export async function archiveBranch(
   await db.update(branches).set({ archivedAt: input.now ?? new Date() }).where(eq(branches.id, row.id));
   return "archived";
 }
+
+/** The branches a staff member may choose (all, or those assigned to them). */
+export function branchesFor<T extends { id: string }>(branches: T[], actorBranchIds: readonly string[] | null | undefined): T[] {
+  return actorBranchIds ? branches.filter((b) => actorBranchIds.includes(b.id)) : branches;
+}

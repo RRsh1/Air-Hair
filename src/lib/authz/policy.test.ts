@@ -73,3 +73,22 @@ describe("patients", () => {
     expect(patientScope(patientSelf, clinicWide)).toEqual({ kind: "self", clinicId: "c1", patientId: "p1" });
   });
 });
+
+describe("branch assignment", () => {
+  const north: StaffActor = { ...drLevi, branchIds: ["north"] };
+  const nowhere: StaffActor = { ...drLevi, branchIds: [] };
+  const treatedNorth = { ...p1, branchIds: ["main", "north"] };
+  const treatedMain = { ...p1, branchIds: ["main"] };
+
+  it("limits staff to patients treated in their branches", () => {
+    expect(canAccessPatient(north, "patient.view", treatedNorth, clinicWide)).toBe(true);
+    expect(canAccessPatient(north, "patient.view", treatedMain, clinicWide)).toBe(false);
+    expect(canAccessPatient(nowhere, "patient.view", treatedNorth, clinicWide)).toBe(false);
+    expect(canAccessPatient(drLevi, "patient.view", treatedMain, clinicWide)).toBe(true);
+  });
+
+  it("carries the branches into list scopes", () => {
+    expect(patientScope(north, clinicWide)).toEqual({ kind: "clinic", clinicId: "c1", branchIds: ["north"] });
+    expect(patientScope(north, assignedOnly)).toEqual({ kind: "assigned", clinicId: "c1", staffId: "dr-levi", branchIds: ["north"] });
+  });
+});

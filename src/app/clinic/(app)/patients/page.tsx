@@ -4,7 +4,7 @@ import { formatAgo } from "@/components/clinic/format";
 import { RecoveryRuler } from "@/components/clinic/recovery-ruler";
 import { getDb } from "@/db/client";
 import { canStaff } from "@/lib/authz/policy";
-import { listBranches } from "@/lib/branches/branches";
+import { branchesFor, listBranches } from "@/lib/branches/branches";
 import { listPatients, type PatientRow } from "@/lib/clinic-patients/patients";
 import { getStaffContext } from "@/lib/clinic-patients/server";
 import { maxScheduleDay } from "@/lib/timeline/capture-schedule";
@@ -33,7 +33,7 @@ async function Register({ searchParams }: Pick<PageProps<"/clinic/patients">, "s
   const status: Status = (["active", "archive", "all"] as const).find((s) => s === one(params.status)) ?? "active";
   const query = one(params.q).slice(0, 80);
   const db = getDb();
-  const branches = await listBranches(db, context.actor.clinicId);
+  const branches = branchesFor(await listBranches(db, context.actor.clinicId), context.actor.branchIds);
   const branchId = branches.find((b) => b.id === one(params.branch))?.id;
   const rows = await listPatients(db, context, { status, branchId, query });
   const totalDays = maxScheduleDay(context.settings.followUpMonths);

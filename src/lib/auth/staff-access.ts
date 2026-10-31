@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { clinics, clinicSettings, staffUsers } from "../../db/schema";
+import { clinics, clinicSettings, staffBranches, staffUsers } from "../../db/schema";
 import type { Database } from "../../db/types";
 import type { StaffRole } from "../authz/capabilities";
 import type { StaffActor } from "../authz/policy";
@@ -18,6 +18,8 @@ export type StaffRecord = {
   fullName: string;
   disabledAt: Date | null;
   settings: ClinicSettings;
+  /** Branches the staff member works in; null means every branch. */
+  branchIds: string[] | null;
 };
 
 export type SessionUser = { id: string; email: string; twoFactorEnabled?: boolean | null };
@@ -55,7 +57,7 @@ export function resolveStaffAccess(
   return {
     state: "ok",
     staff,
-    actor: { kind: "staff", staffId: staff.id, clinicId: staff.clinicId, role: staff.role },
+    actor: { kind: "staff", staffId: staff.id, clinicId: staff.clinicId, role: staff.role, branchIds: staff.branchIds },
   };
 }
 
@@ -68,6 +70,7 @@ export async function loadStaffByAuthUser(db: Database, authUserId: string): Pro
       role: staffUsers.role,
       fullName: staffUsers.fullName,
       disabledAt: staffUsers.disabledAt,
+      allBranches: staffUsers.allBranches,
       settings: clinicSettings.settings,
     })
     .from(staffUsers)
@@ -78,5 +81,9 @@ export async function loadStaffByAuthUser(db: Database, authUserId: string): Pro
 
   const row = rows[0];
   if (!row) return null;
-  return { ...row, settings: parseClinicSettings(row.settings) };
+  const { allBranches, ...rest } = row;
+  const branchIds = allBranches
+    ? null
+    : (await db.select({ branchId: staffBranches.branchId }).from(staffBranches).where(eq(staffBranches.staffId, row.id))).map((b) => b.branchId);
+  return { ...rest, settings: parseClinicSettings(row.settings), branchIds };
 }

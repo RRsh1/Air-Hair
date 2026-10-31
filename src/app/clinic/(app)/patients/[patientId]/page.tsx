@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { formatLong, formatMobile, formatShort } from "@/components/clinic/format";
 import { procedureOptions } from "@/components/clinic/procedure-options";
 import { getDb } from "@/db/client";
-import { listBranches } from "@/lib/branches/branches";
+import { branchesFor, listBranches } from "@/lib/branches/branches";
 import { listClinicProcedures, listLibrary } from "@/lib/catalog/procedures";
 import { openPatient, staffMayAccess, type TreatmentDetail } from "@/lib/clinic-patients/patients";
 import { getStaffContext, staffRequestIp } from "@/lib/clinic-patients/server";
@@ -38,7 +38,7 @@ async function Card({ params }: Pick<PageProps<"/clinic/patients/[patientId]">, 
   const { card } = result;
 
   const [branches, procedures, library, canEdit, canMark] = await Promise.all([
-    listBranches(db, context.actor.clinicId),
+    listBranches(db, context.actor.clinicId).then((all) => branchesFor(all, context.actor.branchIds)),
     listClinicProcedures(db, context.actor.clinicId),
     listLibrary(db),
     staffMayAccess(db, context, card.id, "patient.edit"),

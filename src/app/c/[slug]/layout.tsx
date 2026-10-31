@@ -8,12 +8,26 @@ import "@fontsource-variable/assistant";
 import "@fontsource-variable/frank-ruhl-libre";
 import "@fontsource-variable/noto-serif-hebrew";
 import "@fontsource/secular-one";
+import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { selectedBranchId } from "@/lib/journal/patient-journal";
 import { getClinic, getPatientContext } from "@/lib/patient-auth/server";
 import { defaultPatientTheme, themeToCss } from "@/lib/theme/patient-theme";
 import { getClinicBranding } from "@/lib/theme/server";
+
+/** Installable as the clinic's own app (manifest, home-screen icons, iOS standalone mode). */
+export async function generateMetadata({ params }: LayoutProps<"/c/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const clinic = await getClinic(slug);
+  const base = `/c/${slug}`;
+  return {
+    title: clinic?.name ?? "Hair&Air",
+    manifest: `${base}/manifest.webmanifest`,
+    icons: { apple: [{ url: `${base}/icon/180`, sizes: "180x180" }], icon: [{ url: `${base}/icon/192`, sizes: "192x192" }] },
+    appleWebApp: { capable: true, title: clinic?.name ?? "Hair&Air", statusBarStyle: "default" },
+  };
+}
 
 /**
  * Patient app shell. The default theme is part of the static shell; the clinic's published theme

@@ -60,6 +60,13 @@ export type PatientFilter = {
   query?: string;
 };
 
+/** Patients with a treatment in one of these branches (staff limited to branches). */
+function inBranches(branchIds: readonly string[] | undefined): SQL | undefined {
+  if (!branchIds) return undefined;
+  if (branchIds.length === 0) return sql`false`;
+  return sql`exists (select 1 from ${treatments} where ${treatments.patientId} = ${patients.id} and ${inArray(treatments.branchId, [...branchIds])})`;
+}
+
 function scopeWhere(scope: PatientScope): SQL {
   switch (scope.kind) {
     case "none":
@@ -67,13 +74,14 @@ function scopeWhere(scope: PatientScope): SQL {
     case "self":
       return and(eq(patients.clinicId, scope.clinicId), eq(patients.id, scope.patientId))!;
     case "clinic":
-      return eq(patients.clinicId, scope.clinicId);
+      return and(eq(patients.clinicId, scope.clinicId), inBranches(scope.branchIds))!;
     case "assigned":
       return and(
         eq(patients.clinicId, scope.clinicId),
         exists(
           sql`(select 1 from ${patientAssignments} where ${patientAssignments.patientId} = ${patients.id} and ${patientAssignments.staffId} = ${scope.staffId})`,
         ),
+        inBranches(scope.branchIds),
       )!;
   }
 }
@@ -366,14 +374,19 @@ export async function staffMayAccess(db: Database, context: StaffContext, patien
     .where(and(eq(patients.id, patientId), eq(patients.clinicId, context.actor.clinicId)))
     .limit(1);
   if (!row) return false;
-  const assigned = await db
-    .select({ staffId: patientAssignments.staffId })
-    .from(patientAssignments)
-    .where(eq(patientAssignments.patientId, patientId));
+  const [assigned, treated] = await Promise.all([
+    db.select({ staffId: patientAssignments.staffId }).from(patientAssignments).where(eq(patientAssignments.patientId, patientId)),
+    db.selectDistinct({ branchId: treatments.branchId }).from(treatments).where(eq(treatments.patientId, patientId)),
+  ]);
   return canAccessPatient(
     context.actor,
     capability,
-    { clinicId: context.actor.clinicId, patientId, assignedStaffIds: assigned.map((a) => a.staffId) },
+    {
+      clinicId: context.actor.clinicId,
+      patientId,
+      assignedStaffIds: assigned.map((a) => a.staffId),
+      branchIds: treated.map((t) => t.branchId),
+    },
     context.settings,
   );
 }

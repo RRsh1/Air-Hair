@@ -10,6 +10,7 @@ const staff: StaffRecord = {
   fullName: "אדמין",
   disabledAt: null,
   settings: parseClinicSettings({}),
+  branchIds: null,
 };
 const notEnrolled = { id: "u1", email: "a@test.com", twoFactorEnabled: false };
 

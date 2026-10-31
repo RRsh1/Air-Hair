@@ -94,12 +94,21 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
   later organization changes; a merged result that fails contrast falls back to the organization's theme.
   `resetBranchBranding` drops the override and logo. Patient pages pass the selected treatment's branch
   (`selectedBranchId(journal)`) to `getClinicBranding`; login and privacy pages use the organization's.
+- Staff (/clinic/staff, staff.manage; src/lib/staff/manage.ts): invite (Better Auth user with a random
+  password + "set your password" link, then TOTP at first sign-in), edit name / manager level / branches,
+  disable (sessions revoked) and re-enable, resend the link. On screen: "מנהל" = role admin, otherwise
+  "צוות" = role doctor. Invariants: at least one active admin with every branch; managers can't demote,
+  restrict or disable themselves. "ממתין להפעלה" = TOTP not enrolled yet.
+- Branch assignment is enforced by the policy: `StaffActor.branchIds` (null = every branch, loaded by
+  `loadStaffByAuthUser`), `PatientRef.branchIds` (the patient's treatment branches), and `patientScope`
+  carries `branchIds` into list queries. Branch pickers show only the member's branches (`branchesFor`)
+  and actions refuse others.
 - Local dashboard check: REQUIRE_STAFF_2FA=false in .env.local (dev only) and a known admin password.
 
 ## Organization, branches, catalog
 - Branches (src/lib/branches): every clinic has exactly one main branch (created by `provisionClinic`,
   the default for new treatments; it will run org-wide reports). `staff_users.all_branches` + `staff_branches`
-  record branch assignment; the access policy does not enforce it yet (that change goes through authz).
+  record branch assignment, enforced by the access policy (see Staff above).
 - Catalog (src/lib/catalog): `procedure_library` is platform-wide (hair.scalp, hair.beard, hair.mustache,
   hair.eyebrows; dental/wound planned). A clinic adopts one with `adoptLibraryProcedure`, which creates its
   own timeline template (library_key) with a published v1; the clinic then edits its copy.
@@ -153,6 +162,12 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 - Themes are refused when text fails WCAG contrast in any block (`themeIssues`). Presets: src/lib/theme/presets.ts.
   Clinics edit it in the dashboard (/clinic/branding); scripts/publish-branding.ts remains for setup.
 - If patient styles look stale in `next dev`, stop it and delete `.next` (Turbopack's Tailwind cache).
+- Install to home screen: /c/<slug>/manifest.webmanifest (clinic name and colors, start_url and scope
+  /c/<slug>/), icons from /c/<slug>/icon/<180|192|512|512-maskable> (ImageResponse: the logo on a white tile,
+  or the ruler marker in the accent color), and /c/<slug>/sw.js, a service worker that caches nothing and
+  only answers failed page loads with an offline notice (it makes the install prompt available). `InstallApp`
+  on the home screen uses the browser prompt (Android) or shows the Share-sheet steps (iPhone); hidden when
+  already installed or dismissed (localStorage).
 - SMS: src/lib/notifications/sms.ts prints to the console in development; in production there is no
   provider yet, so patient login is closed for everyone until one is added.
 
@@ -169,5 +184,6 @@ dashboard slice 1 (shell, patient register, new patient, patient card with treat
 signed documents, lifecycle actions, returning patient), Puck RTL spike (branch spike/puck, go),
 dashboard slice 2 (capability-based nav, settings, branches, legal documents with coverage), branding editor
 with per-branch override.
-Next: staff users + branch assignment (touches auth/authz), then leads/CRM, reports, landing page builder,
+staff management with branch-enforced access, patient app install to home screen.
+Next: leads/CRM (with embedding on an existing clinic site), reports, landing page builder,
 operator console. Also: RLS on clinic_id, SMS + email providers, R2 storage, per-procedure capture angles.

@@ -22,6 +22,13 @@ export type FormState = {
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
 
+/** The chosen branch, or the staff member's first branch; refused when outside their branches. */
+function branchFor(actor: { branchIds?: readonly string[] | null }, chosen: string): { ok: true; branchId?: string } | { ok: false } {
+  if (!actor.branchIds) return { ok: true, branchId: chosen || undefined };
+  const branchId = chosen || actor.branchIds[0];
+  return branchId && actor.branchIds.includes(branchId) ? { ok: true, branchId } : { ok: false };
+}
+
 /** "t:<templateId>" is one of the clinic's procedures; "l:<key>" a library procedure it adopts now. */
 async function resolveProcedure(db: Database, clinicId: string, value: string, staffId: string): Promise<string | null> {
   if (value.startsWith("t:")) return value.slice(2) || null;
@@ -50,6 +57,8 @@ export async function createPatientAction(_prev: FormState, form: FormData): Pro
   const templateId = await resolveProcedure(db, context.actor.clinicId, values.procedure, context.actor.staffId);
   if (!templateId) return { status: "error", field: "procedure", message: "בחרו טיפול.", values };
 
+  const branch = branchFor(context.actor, values.branchId);
+  if (!branch.ok) return { status: "error", field: "branch", message: "אפשר לפתוח טיפול רק בסניפים שלך.", values };
   const result = await createPatient(db, {
     clinicId: context.actor.clinicId,
     fullName: values.fullName,
@@ -57,7 +66,7 @@ export async function createPatientAction(_prev: FormState, form: FormData): Pro
     phone: values.phone,
     plannedSurgeryDate: values.plannedSurgeryDate,
     templateId,
-    branchId: values.branchId || undefined,
+    branchId: branch.branchId,
     createdByStaffId: context.actor.staffId,
   });
   switch (result.status) {
@@ -82,11 +91,13 @@ export async function addTreatmentAction(patientId: string, _prev: FormState, fo
 
   const templateId = await resolveProcedure(db, context.actor.clinicId, values.procedure, context.actor.staffId);
   if (!templateId) return { status: "error", field: "procedure", message: "בחרו טיפול.", values };
+  const branch = branchFor(context.actor, values.branchId);
+  if (!branch.ok) return { status: "error", field: "branch", message: "אפשר לפתוח טיפול רק בסניפים שלך.", values };
   const result = await addTreatment(db, {
     clinicId: context.actor.clinicId,
     patientId,
     templateId,
-    branchId: values.branchId || undefined,
+    branchId: branch.branchId,
     plannedSurgeryDate: values.plannedSurgeryDate,
     staffId: context.actor.staffId,
   });

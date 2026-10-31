@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { procedureOptions } from "@/components/clinic/procedure-options";
 import { getDb } from "@/db/client";
 import { canStaff } from "@/lib/authz/policy";
-import { listBranches } from "@/lib/branches/branches";
+import { branchesFor, listBranches } from "@/lib/branches/branches";
 import { listClinicProcedures, listLibrary } from "@/lib/catalog/procedures";
 import { getStaffContext } from "@/lib/clinic-patients/server";
 import { NewPatientForm } from "./new-patient-form";
@@ -31,7 +31,7 @@ async function Form() {
   if (!canStaff(context.actor, "patient.create", context.settings)) redirect("/clinic/patients");
   const db = getDb();
   const [branches, procedures, library] = await Promise.all([
-    listBranches(db, context.actor.clinicId),
+    listBranches(db, context.actor.clinicId).then((all) => branchesFor(all, context.actor.branchIds)),
     listClinicProcedures(db, context.actor.clinicId),
     listLibrary(db),
   ]);

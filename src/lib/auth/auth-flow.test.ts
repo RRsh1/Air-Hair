@@ -130,7 +130,7 @@ describe("staff authentication", () => {
     const access = await browser.access();
     expect(access.state).toBe("ok");
     if (access.state === "ok") {
-      expect(access.actor).toEqual({ kind: "staff", staffId: clinic.staffId, clinicId: clinic.clinicId, role: "admin" });
+      expect(access.actor).toEqual({ kind: "staff", staffId: clinic.staffId, clinicId: clinic.clinicId, role: "admin", branchIds: null });
     }
   });
 

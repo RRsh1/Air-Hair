@@ -14,6 +14,11 @@ export type StaffActor = {
   clinicId: string;
   role: StaffRole;
   disabled?: boolean;
+  /**
+   * The branches this staff member works in; null or absent means every branch. A staff member
+   * limited to branches sees and acts on patients with at least one treatment in one of them.
+   */
+  branchIds?: readonly string[] | null;
 };
 
 export type PatientActor = {
@@ -28,7 +33,15 @@ export type PatientRef = {
   clinicId: string;
   patientId: string;
   assignedStaffIds: readonly string[];
+  /** Branches of the patient's treatments (needed when the actor is limited to branches). */
+  branchIds?: readonly string[];
 };
+
+/** True when the actor may work with a patient treated in these branches. */
+function inActorBranches(actor: StaffActor, branchIds: readonly string[] | undefined): boolean {
+  if (!actor.branchIds) return true;
+  return (branchIds ?? []).some((id) => actor.branchIds!.includes(id));
+}
 
 const NONE: ReadonlySet<Capability> = new Set();
 
@@ -59,6 +72,7 @@ export function canAccessPatient(
 
   const caps = staffCapabilities(actor, settings);
   if (!caps.has(capability) || !caps.has("patient.view")) return false;
+  if (!inActorBranches(actor, patient.branchIds)) return false;
   return caps.has("patient.view_all") || patient.assignedStaffIds.includes(actor.staffId);
 }
 
@@ -68,8 +82,8 @@ export function canAccessPatient(
  */
 export type PatientScope =
   | { kind: "none" }
-  | { kind: "clinic"; clinicId: string }
-  | { kind: "assigned"; clinicId: string; staffId: string }
+  | { kind: "clinic"; clinicId: string; branchIds?: readonly string[] }
+  | { kind: "assigned"; clinicId: string; staffId: string; branchIds?: readonly string[] }
   | { kind: "self"; clinicId: string; patientId: string };
 
 export function patientScope(actor: Actor, settings: ClinicSettings): PatientScope {
@@ -77,6 +91,8 @@ export function patientScope(actor: Actor, settings: ClinicSettings): PatientSco
 
   const caps = staffCapabilities(actor, settings);
   if (!caps.has("patient.view")) return { kind: "none" };
-  if (caps.has("patient.view_all")) return { kind: "clinic", clinicId: actor.clinicId };
-  return { kind: "assigned", clinicId: actor.clinicId, staffId: actor.staffId };
+  // Limited to branches: patients with a treatment in one of them (an empty list sees none).
+  const branches = actor.branchIds ? { branchIds: actor.branchIds } : {};
+  if (caps.has("patient.view_all")) return { kind: "clinic", clinicId: actor.clinicId, ...branches };
+  return { kind: "assigned", clinicId: actor.clinicId, staffId: actor.staffId, ...branches };
 }
