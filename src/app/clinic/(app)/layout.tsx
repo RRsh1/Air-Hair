@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { Wordmark } from "@/components/clinic/wordmark";
 import { requireStaff } from "@/lib/auth/server";
-import { CurrentNavLinks, NavLinks } from "./nav-links";
+import { canStaff } from "@/lib/authz/policy";
+import { CurrentNavLinks, NavLinks, type Section } from "./nav-links";
 import { SignOutButton } from "./sign-out-button";
 
 /** The signed-in dashboard: a rail with the clinic and its sections, and the page. */
@@ -20,8 +21,8 @@ export default function DashboardLayout({ children }: LayoutProps<"/clinic">) {
             <SignOutButton />
           </div>
         </div>
-        <Suspense fallback={<NavLinks current={null} />}>
-          <CurrentNavLinks />
+        <Suspense fallback={<NavLinks sections={baseSections} current={null} />}>
+          <Nav />
         </Suspense>
         <div className="mt-auto hidden border-t border-line px-6 py-5 md:block">
           <Suspense fallback={null}>
@@ -35,6 +36,19 @@ export default function DashboardLayout({ children }: LayoutProps<"/clinic">) {
       <main className="min-w-0 flex-1">{children}</main>
     </div>
   );
+}
+
+const baseSections: Section[] = [{ href: "/clinic/patients", label: "מטופלים" }];
+
+/** Sections the staff member may open; the current one is marked on the client. */
+async function Nav() {
+  const { staff, actor } = await requireStaff();
+  const sections = [
+    ...baseSections,
+    ...(canStaff(actor, "legal.manage", staff.settings) ? [{ href: "/clinic/documents", label: "מסמכים" }] : []),
+    ...(canStaff(actor, "settings.manage", staff.settings) ? [{ href: "/clinic/settings", label: "הגדרות" }] : []),
+  ];
+  return <CurrentNavLinks sections={sections} />;
 }
 
 async function ClinicName() {

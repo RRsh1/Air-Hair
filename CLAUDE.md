@@ -72,6 +72,16 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 - Actions (src/app/clinic/(app)/patients/actions.ts) check capabilities: create → patient.create;
   add treatment / reschedule → patient.edit; performed / complete / cancel → treatment.mark_performed.
   A new-patient form with an existing ID number offers that patient's card (returning patient).
+- Nav sections follow capabilities: מסמכים needs legal.manage, הגדרות needs settings.manage.
+- Settings (/clinic/settings): clinic name, SMS sender, follow-up length, whether schedule changes reach
+  patients in recovery (`saveClinicProfile`, src/lib/clinic-settings/save.ts: merged + parsed whole,
+  audited). Access-related settings (visibility, who creates patients) stay off the screen until staff
+  management lands (authz area). Branches on the same screen: add, rename, archive (`archiveBranch`
+  refuses the main branch and branches with active treatments).
+- Documents (/clinic/documents): consent and privacy policy versions, signature coverage of the current
+  consent among patients in treatment, publish as text or PDF through the route handler
+  /clinic/documents/publish (multipart form post, same-origin, size-checked; not a server action because
+  of the body limit). Staff open any version's PDF at /clinic/documents/[documentId].
 - Local dashboard check: REQUIRE_STAFF_2FA=false in .env.local (dev only) and a known admin password.
 
 ## Organization, branches, catalog
@@ -98,8 +108,7 @@ TypeScript strict, Tailwind, Drizzle ORM + Neon Postgres (EU, Frankfurt), zod, v
 - Consent and privacy policy (src/lib/legal): each clinic publishes versions as text or PDF; the newest
   published is current. A patient signs the current consent (drawn signature PNG + content hash, IP,
   browser); a new version asks everyone again. No published consent document → nothing to sign.
-  Until the dashboard upload screen exists, publish with
-  `npx tsx --conditions=react-server scripts/publish-legal.ts --clinic demo --kind consent --text scripts/samples/consent-sample.txt`.
+  Clinics publish from the dashboard (/clinic/documents); scripts/publish-legal.ts remains for setup.
 - The server decides the day of a photo (`anglesOpenNow`, `savePatientPhoto`); the client never does.
 - Photos: browser crops to 3:4, resizes to 1600px and re-encodes JPEG (strips EXIF); the server runs
   `sanitizeJpeg` (whole-file walk, drops metadata, nothing after EOI) and stores its output. Saves lock
@@ -146,7 +155,7 @@ alignment ghost, day view with comparison), patient-side security review fixes, 
 logo on every photo + download), diary (overview, month + day list, day page) with day notes,
 platform foundation (branches, procedure catalog, treatment lifecycle, returning patients, treatment switcher),
 dashboard slice 1 (shell, patient register, new patient, patient card with treatments, contact sheet, notes,
-signed documents, lifecycle actions, returning patient).
-Next: Puck RTL spike for the landing builder; dashboard: documents, settings, branding editor with live preview
-and per-branch override, branches screen; staff users + branch assignment (touches auth/authz), then leads/CRM, reports, landing page builder,
+signed documents, lifecycle actions, returning patient), Puck RTL spike (branch spike/puck, go),
+dashboard slice 2 (capability-based nav, settings, branches, legal documents with coverage).
+Next: dashboard branding editor with live preview and per-branch override; staff users + branch assignment (touches auth/authz), then leads/CRM, reports, landing page builder,
 operator console. Also: RLS on clinic_id, SMS + email providers, R2 storage, per-procedure capture angles.

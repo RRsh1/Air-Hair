@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const sections = [{ href: "/clinic/patients", label: "מטופלים" }];
+export type Section = { href: string; label: string };
 
 /** The nav with the current section marked (reads the URL, so it streams in). */
-export function CurrentNavLinks() {
-  return <NavLinks current={usePathname()} />;
+export function CurrentNavLinks({ sections }: { sections: Section[] }) {
+  return <NavLinks sections={sections} current={usePathname()} />;
 }
 
-export function NavLinks({ current: pathname }: { current: string | null }) {
+export function NavLinks({ sections, current: pathname }: { sections: Section[]; current: string | null }) {
   return (
     <nav aria-label="אזורי הלוח" className="px-3 pb-2 md:pb-0">
       <ul className="flex gap-1 md:block md:space-y-0.5">

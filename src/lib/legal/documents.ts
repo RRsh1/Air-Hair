@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
-import { auditLog, consents, legalDocuments } from "../../db/schema";
+import { and, countDistinct, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { auditLog, consents, legalDocuments, treatments } from "../../db/schema";
 import type { Database } from "../../db/types";
 import type { ObjectStorage } from "../storage/types";
 
@@ -44,6 +44,33 @@ export async function currentDocument(db: Database, clinicId: string, kind: Lega
     .orderBy(desc(legalDocuments.version))
     .limit(1);
   return row ? toDocument(row) : null;
+}
+
+/** Every published version of the clinic's documents, newest first per kind. */
+export async function listDocuments(db: Database, clinicId: string): Promise<LegalDocument[]> {
+  const rows = await db
+    .select()
+    .from(legalDocuments)
+    .where(and(eq(legalDocuments.clinicId, clinicId), isNotNull(legalDocuments.publishedAt)))
+    .orderBy(legalDocuments.kind, desc(legalDocuments.version));
+  return rows.map(toDocument);
+}
+
+/** How many of the clinic's patients with an active treatment signed the current consent. */
+export async function consentCoverage(db: Database, clinicId: string): Promise<{ signed: number; active: number } | null> {
+  const document = await currentDocument(db, clinicId, "consent");
+  if (!document) return null;
+  const active = and(eq(treatments.clinicId, clinicId), inArray(treatments.status, ["scheduled", "performed"]));
+  const [[all], [signed]] = await Promise.all([
+    db.select({ n: countDistinct(treatments.patientId) }).from(treatments).where(active),
+    db
+      .select({ n: countDistinct(consents.patientId) })
+      .from(consents)
+      .innerJoin(treatments, eq(treatments.patientId, consents.patientId))
+      .where(and(active, eq(consents.documentId, document.id))),
+  ]);
+  const row = { active: all?.n, signed: signed?.n };
+  return { signed: Number(row?.signed ?? 0), active: Number(row?.active ?? 0) };
 }
 
 /** A published document of this clinic by id (for serving its PDF). */
